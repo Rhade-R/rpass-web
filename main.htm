@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<link href="assets/ss/main.css" rel="stylesheet">
+		<link href="assets/font/Hack/hack.css" rel="stylesheet">
+	</head>
+	<body class="col">
+		<div id="main" class="col">
+			<img src="assets/svg/rpass.svg">
+			<input id="mp" type="password" placeholder="master password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="" required>
+			<input id="service" type="text" placeholder="service name (e.g. github)" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="" required>
+			<input id="user" type="text" placeholder="username" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="" required>
+			<input id="iter" type="text" placeholder="enter an integer here (optional)" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="">
+			<button id="generate" type="button"><span></span></button>
+		</div>
+		<footer class="row" hidden>
+			<a href="./about.htm" cont="About"></a>
+			<a id="copyright" href="https://github.com/Rhade-R/rpass-web/raw/main/COPYING.txt" cont="© Rhade"></a>
+			<a href="https://github.com/Rhade-R/rpass-web" cont="Github"></a>
+		</footer>
+		<script src="assets/js/lib/scrypt/scrypt-async.min.js"></script>
+		<script src="assets/js/main.js"></script>
+	</body>
+</html>

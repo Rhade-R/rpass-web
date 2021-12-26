@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<link href="assets/ss/main.css" rel="stylesheet">
+		<link href="assets/font/Hack/hack.css" rel="stylesheet">
+	</head>
+	<body>
+		<h1>Yet another strong password generator</h1>
+		<div class="iframe-container">
+			<iframe id="odysee-iframe" width="560" height="315" src="https://odysee.com/$/embed/Edward-Snowden-on-Passwords_-Last-Week-Tonight-with-John-Oliver-%28HBO%29/2d25c9c637ee3197bfe0a1d94da3b8fc9e72fbe4?r=9vjMz1jzB2KHUahc7BEb41vhgHvrmFPF" allowfullscreen></iframe>
+		</div>
+		<p>Summing up, passwords:</p>
+		<ul>
+			<li>should be long</li>
+			<li>should contain a combination of lower and uppercase letters, numbers, and symbols</li>
+			<li>should not be made up of personal information, such as names, birth dates or the like</li>
+			<li>should not contain common phrases</li>
+			<li>should never be reused (permutations do not make much of a difference)</li>
+		</ul>
+		<p>Ideally, they also:</p>
+		<ul>
+			<li>should never be shared with anyone</li>
+			<li>should be stored securely</li>
+			<li>should be changed every now and then</li>
+		</ul>
+		<h2>The problem</h2>
+		<p>Reusing the same old, bad passwords over and over is both a really bad and a really common practice, remembering several different complex passwords is not viable, and recording them by hand is far from practical and can even be risky.</p>
+		<p>When it comes to managing passwords, there are many solutions out there, each with its own pros and cons. None of them are perfect, but using even the most minimally well-made password manager application or add-on is far better than reusing bad passwords, from a security standpoint. They make managing passwords a viable choice for even an average, non-tech-savvy, relatively busy human being. I hope John is using one of these by now.</p>
+		<h2>Introducing <sup>r</sup>pass</h2>
+		<p>This solution is not a password manager, but a password generator. It uses a state-of-the-art hash function (or more precisely, a key-derivation function) named Scrypt, to generate, as of this writing, fifty-character-long passwords composed of a combination of 95 printable ASCII characters. Passwords generated this way are therefore impervious to dictionary attacks, since they typically do not resemble any even remotely intelligible information, and impossible to bruteforce by modern computers in a reasonable amount of time. In fact, <sup>r</sup>pass can theoretically generate up to 95<sup>50</sup> different passwords, which is roughly 7.69x10<sup>98</sup> (or 769 followed by 96 zeros). The Sun will literally turn into a Red Giant and engulf this planet long before any computer finishes trying out that many combinations.</p>
+
+		<p>Moreover, hash functions, or key-derivation functions, are one-way algorithms, meaning they cannot be reversed to figure out the input (your master password and username) from the output (the hash, or password in this case), somewhat in the same way the exact addends of a regular summation of an arbitrary number of addends cannot be figured out from the sum.</p>
+
+		<p>Using <sup>r</sup>pass, all you need to remember is a single unique master password (or passphrase), and your different usernames for each service. Entering the same master password but different service names or usernames yields unique passwords for each one of them. This means you can have as many accounts in as many services as you want, and all of them will have unique, strong passwords that you do not need to remember, because <sup>r</sup>pass will generate the same ones over and over given the same input values. For the same reason, they do not need to be stored or backed up anywhere either.</p>
+		<p>I reckon mister Snowden would be proud~</p>
+	</body>
+</html>
