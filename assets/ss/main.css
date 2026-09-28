@@ -107,10 +107,11 @@ input:focus:not(#host) {
    width: 100%;
 }
 #main {
-	width: 25em;
+	width: 100%;
+	max-width: 25em;
 	align-items: stretch;
 }
-#service, #user {flex: auto;}
+#service, #user, #iter {flex: auto;}
 #version:after {
 	top: 0;
 	left: 100;
@@ -143,3 +144,55 @@ input:focus:not(#host) {
 }
 
 [cont]::after {content: attr(cont);}
+
+/* Algorithm toggle. Sits below the iter input and mirrors the
+   extension's badge: outline only, blue for v1, green for v2. */
+#algorithm {
+	background: var(--transp);
+	outline: 1px solid var(--button-bgc);
+	color: var(--button-bgc);
+	font-weight: 700;
+}
+#algorithm:hover {
+	background: var(--button-hover-bgc);
+	color: #FFF;
+	outline-color: var(--button-hover-bgc);
+}
+#algorithm:active {
+	background: var(--button-focus-bgc);
+	outline-color: var(--button-focus-bgc);
+}
+#algorithm.v2 {
+	outline-color: var(--success-bgc);
+	color: var(--success-bgc);
+}
+#algorithm.v2:hover {
+	background: var(--success-hover-bgc);
+	color: #000;
+	outline-color: var(--success-hover-bgc);
+}
+#algorithm.v2:active {
+	background: var(--success-focus-bgc);
+	color: #000;
+	outline-color: var(--success-focus-bgc);
+}
+
+/* Import button. Secondary action, so it mirrors the #algorithm
+   badge treatment (outline only, blue). The generate button keeps
+   the solid background as the primary action. */
+#import {
+	background: var(--transp);
+	outline: 1px solid var(--button-bgc);
+	color: var(--button-bgc);
+	font-weight: 700;
+	font-size: 0.9em;
+}
+#import:hover {
+	background: var(--button-hover-bgc);
+	color: #FFF;
+	outline-color: var(--button-hover-bgc);
+}
+#import:active {
+	background: var(--button-focus-bgc);
+	outline-color: var(--button-focus-bgc);
+}

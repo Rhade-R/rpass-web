@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<link href="assets/ss/main.css" rel="stylesheet">
+		<link href="assets/font/Hack/hack.css" rel="stylesheet">
+		<style>
+			body { padding: 1em; }
+			#test-output {
+				width: 60em;
+				max-width: 95vw;
+				margin: 0 auto;
+			}
+			#test-output pre {
+				text-align: left;
+				text-align-last: left;
+				font-size: 0.8em;
+				overflow-x: auto;
+				max-height: 80vh;
+				white-space: pre;
+				background: #111;
+				padding: 0.75em;
+				border-radius: 8px;
+			}
+			#summary {
+				font-weight: 700;
+				margin: 0.5em 0;
+			}
+		</style>
+	</head>
+	<body>
+		<div id="test-output">
+			<h1>rpass-web reference vectors</h1>
+			<p id="summary">Loading…</p>
+			<pre id="results"></pre>
+		</div>
+		<script src="assets/js/lib/scrypt/scrypt-async.min.js"></script>
+		<script src="assets/js/derive.js"></script>
+		<script src="assets/js/vault.js"></script>
+		<script type="application/json" id="v2-vectors">{
+  "vectors": [
+    {
+      "mp": "a",
+      "service": "a",
+      "user": "a",
+      "iter": "0",
+      "password": "!Xov95a+HHXZ2dRAaiW0jCm9kwNYcqgb"
+    },
+    {
+      "mp": "test",
+      "service": "example.com",
+      "user": "alice",
+      "iter": "0",
+      "password": "u15KBeLGa%--oDzRp-C)OVWs=v!0H!2X"
+    },
+    {
+      "mp": "test",
+      "service": "example.com",
+      "user": "alice",
+      "iter": "1",
+      "password": "+)mExfiIAP7C@hDbefFFTH6A!7Zd$+be"
+    },
+    {
+      "mp": "test",
+      "service": "example.com",
+      "user": "alice",
+      "iter": "007",
+      "password": "rg96UL1bFMdd1QRjd0CtZmV&jWzM7YO^"
+    },
+    {
+      "mp": "test",
+      "service": "example.com",
+      "user": "alice",
+      "iter": "abc12",
+      "password": "yZGL*E22IWTyp_CUrw=QO&aU$Pq3=&aW"
+    },
+    {
+      "mp": "test",
+      "service": "example.com",
+      "user": "bob",
+      "iter": "0",
+      "password": "x7zLGWrz=HPUdvMVO+qYm@ISXl8(jy!H"
+    },
+    {
+      "mp": "Correct Horse Battery Staple",
+      "service": "github.com",
+      "user": "octocat",
+      "iter": "0",
+      "password": "FewDqRnSZFQ33NAwiou&!1GuwqUUrYr*"
+    },
+    {
+      "mp": "p@$$w0rd!#%^&*()",
+      "service": "mail.google.com",
+      "user": "user@example.com",
+      "iter": "3",
+      "password": "qKqfLhaKg%Wa)zN5IBj^SfpBuL_iG%XI"
+    },
+    {
+      "mp": "  spaces  ",
+      "service": "example.com",
+      "user": "alice",
+      "iter": "0",
+      "password": "EXnbP$I3Y)M2732m96sz!kxO10_HqX%T"
+    },
+    {
+      "mp": "pässwörd",
+      "service": "exämple.com",
+      "user": "álice",
+      "iter": "0",
+      "password": "_Fws2BMw8R7IVJPif1b7i7HZ%oojz@QS"
+    },
+    {
+      "mp": "🔐secret",
+      "service": "example.com",
+      "user": "alice",
+      "iter": "0",
+      "password": "hpM4WU(TXyMjj5lTUy$0hL_@t1xU&dpE"
+    }
+  ],
+  "separation": [
+    {
+      "mp": "test",
+      "a": {
+        "iter": "0",
+        "service": "ab",
+        "user": "c"
+      },
+      "b": {
+        "iter": "0",
+        "service": "a",
+        "user": "bc"
+      },
+      "passwordA": "tDU)8z2jqBwT*$n^GS*#VrZsM6rwdUlu",
+      "passwordB": "CU)^FYGy%Z_SCEVW1_hJyf8IXKVa+u4a"
+    },
+    {
+      "mp": "test",
+      "a": {
+        "iter": "1",
+        "service": "example.com",
+        "user": "alice"
+      },
+      "b": {
+        "iter": "1",
+        "service": "example.co",
+        "user": "malice"
+      },
+      "passwordA": "+)mExfiIAP7C@hDbefFFTH6A!7Zd$+be",
+      "passwordB": "#JjhkVq!dUTEPW=SLxVdx81fcDgL5J9g"
+    }
+  ]
+}</script>
+		<script type="application/json" id="legacy-vectors">[
+  {
+    "mp": "a",
+    "service": "a",
+    "user": "a",
+    "iter": "0",
+    "password": "xhG{JzTAWI>c:\"]H3wEm&,>)$$$5b85_f<bZ$01fElkS[gkoX(",
+    "verifier": "vjq8ym3Xe/XqIxaPa5QHiqfoeSRxrqwrJ3IGtkLlduo="
+  },
+  {
+    "mp": "test",
+    "service": "example.com",
+    "user": "alice",
+    "iter": "0",
+    "password": "{9X:^<vb}jv$*DIM\\f}%>^130FUA\\ C[E1m_sH@*uP[8kgH.]Q",
+    "verifier": "/cMYTbrhyziYZznBIAOHJtcx8Kry6YM4J57MoDIM12Y="
+  },
+  {
+    "mp": "test",
+    "service": "example.com",
+    "user": "alice",
+    "iter": "1",
+    "password": "Pt`$7v*;_G9dXz!UVq Ik<-G!\"+5TM}JHF<%LXCS+{UBQrY5*K",
+    "verifier": "/cMYTbrhyziYZznBIAOHJtcx8Kry6YM4J57MoDIM12Y="
+  },
+  {
+    "mp": "test",
+    "service": "example.com",
+    "user": "alice",
+    "iter": "007",
+    "password": "\\};VuOD&\\M@YSccT,iV31\\KVOfYT0R%VMfn$w(kEsf$ D2`t2-",
+    "verifier": "/cMYTbrhyziYZznBIAOHJtcx8Kry6YM4J57MoDIM12Y="
+  },
+  {
+    "mp": "test",
+    "service": "example.com",
+    "user": "alice",
+    "iter": "abc12",
+    "password": "[M,)eR#@X[,<u|ViQiR:ir\"fOpq#d^7p~J(dq>:3v1^%[tnp(L",
+    "verifier": "/cMYTbrhyziYZznBIAOHJtcx8Kry6YM4J57MoDIM12Y="
+  },
+  {
+    "mp": "test",
+    "service": "example.com",
+    "user": "alice",
+    "iter": "000",
+    "password": "{9X:^<vb}jv$*DIM\\f}%>^130FUA\\ C[E1m_sH@*uP[8kgH.]Q",
+    "verifier": "/cMYTbrhyziYZznBIAOHJtcx8Kry6YM4J57MoDIM12Y="
+  },
+  {
+    "mp": "test",
+    "service": "example.com",
+    "user": "alice",
+    "iter": 42,
+    "password": "1{8o{m=*waq:<.{ktATI9Go #'>rUx[*;GX<X!T-)<[SIaUIfV",
+    "verifier": "/cMYTbrhyziYZznBIAOHJtcx8Kry6YM4J57MoDIM12Y="
+  },
+  {
+    "mp": "test",
+    "service": "  Example.COM  ",
+    "user": "  Alice  ",
+    "iter": "0",
+    "password": "{9X:^<vb}jv$*DIM\\f}%>^130FUA\\ C[E1m_sH@*uP[8kgH.]Q",
+    "verifier": "/cMYTbrhyziYZznBIAOHJtcx8Kry6YM4J57MoDIM12Y="
+  },
+  {
+    "mp": "test",
+    "service": "example.com",
+    "user": "bob",
+    "iter": "0",
+    "password": "THCc7Su=Tjj$U]@zH<1QL@(*>dTo,`\\dbdx[S>K}W%FtGXl-55",
+    "verifier": "/cMYTbrhyziYZznBIAOHJtcx8Kry6YM4J57MoDIM12Y="
+  },
+  {
+    "mp": "Correct Horse Battery Staple",
+    "service": "github.com",
+    "user": "octocat",
+    "iter": "0",
+    "password": "]\"8L%(J&F?&2izCf9b;6@HUUO]cHDC]:L!J y9Q{,7:e !*+Y^",
+    "verifier": "Yy8VazlOrEy070Z1nKS9kGqhvobhpHtl7W/1rRvwFfQ="
+  },
+  {
+    "mp": "p@$$w0rd!#%^&*()",
+    "service": "mail.google.com",
+    "user": "user@example.com",
+    "iter": "3",
+    "password": "FNasV*ITJ13(5,TvOI)^C[\"u){jw+YP^5_*ni(Y_aXc8,#CqeD",
+    "verifier": "Q6K1Je6umt+QwS20cNkjcx0cBHo36hfQi3XSyDf+LyI="
+  },
+  {
+    "mp": "  spaces  ",
+    "service": "example.com",
+    "user": "alice",
+    "iter": "0",
+    "password": "Y5]S\"UUAk)Tj(zPiPh?9P(=>6$eg$u C7D&N \"LUB,iAASm:'F",
+    "verifier": "3ACsZgRNDeNRkqcfQ/JdA/k04qGvux2pPDcW4Wm6Xgs="
+  },
+  {
+    "mp": "pässwörd",
+    "service": "exämple.com",
+    "user": "álice",
+    "iter": "0",
+    "password": "uo3eL#L!T;>]aj<+R;JSBUq3R?/=<$ESJfacbI'K04Yo%YobC,",
+    "verifier": "BAkqHERYA9/NvKz4Np3Xs9x7xX6AuHkYEk1RuM9Volc="
+  },
+  {
+    "mp": "🔐secret",
+    "service": "example.com",
+    "user": "alice",
+    "iter": "0",
+    "password": "z#0b[6QP=U8[C1hrK\"72zs\"ydIDRc49&*<6:+a+,s^t27T .b#",
+    "verifier": "dvbJJEV52IUUP0zRKMCXJjfldU1bgZSexznpuq741+c="
+  },
+  {
+    "mp": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "service": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy",
+    "user": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz",
+    "iter": "9999",
+    "password": "8M]!9p[vTS@.zR2C ,L0&396 @u/ ^ZwF%$R3w8C34oX^`6s(I",
+    "verifier": "daZ9AhJ2P96AN+O6/lSKo6L3Jacl9jxvtUMmmAvWku8="
+  }
+]</script>
+		<script src="assets/js/test.js"></script>
+	</body>
+</html>

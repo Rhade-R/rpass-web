@@ -44,3 +44,6 @@ Thumbs.db
 *.sh
 *.bat
 .editorconfig
+
+# Single-file build output (regenerated, not committed)
+/dist/
