@@ -12,6 +12,10 @@ Reads the multi-file sources in src/ and writes, at the repository root:
 Every stylesheet, script, font and image is inlined, so each output is a
 single file that can be hashed, saved, and used offline.
 
+Nothing is written until the reference vectors (src/test.htm) have passed
+against the scripts inlined in the built page; this needs Node.js 18+
+(scripts/test-vectors.js).  Pass --skip-tests to build without Node.
+
 The output is deterministic.  Sources are read with universal newlines and
 the result is written as UTF-8 with LF line endings, so identical sources
 give identical bytes (and an identical SHA-256) on Windows, macOS and Linux.
@@ -20,11 +24,15 @@ The single-file CSP permits 'unsafe-inline' for scripts and styles, because
 they are inline; the multi-file sources keep the strict 'self' policy.
 """
 
+import argparse
 import base64
 import hashlib
 import html as htmllib
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -167,13 +175,50 @@ def build(page):
 
     out = ROOT / page['out']
     data = html.encode('utf-8')
-    out.write_bytes(data)
     return out, data
 
 
+def run_tests(data):
+    """Run the reference vectors against the scripts inlined in `data`.
+
+    Returns True/False, or None when Node.js is not installed."""
+    node = shutil.which('node')
+    if not node:
+        return None
+    with tempfile.TemporaryDirectory() as d:
+        page = Path(d) / 'built.html'
+        page.write_bytes(data)
+        result = subprocess.run(
+            [node, str(ROOT / 'scripts' / 'test-vectors.js'), '--html', str(page)],
+            cwd=str(ROOT))
+    return result.returncode == 0
+
+
 def main():
-    for page in PAGES:
-        out, data = build(page)
+    ap = argparse.ArgumentParser(description='Build the single-file pages.')
+    ap.add_argument('--skip-tests', action='store_true',
+                    help='do not run the reference vectors (output is UNTESTED)')
+    args = ap.parse_args()
+
+    # Build everything in memory first; write nothing until all tests pass.
+    built = [build(page) + (page,) for page in PAGES]
+
+    if args.skip_tests:
+        print('WARNING: --skip-tests given; the output has NOT been tested.')
+    else:
+        for out, data, page in built:
+            if b'RpassDerive' not in data:
+                continue  # about.html has no scripts
+            print('Testing %s ...' % page['out'])
+            ok = run_tests(data)
+            if ok is None:
+                fail('Node.js not found. Install Node 18+, or pass --skip-tests '
+                     '(the output would be untested).')
+            if not ok:
+                fail('reference vectors FAILED for %s; nothing was written.' % page['out'])
+
+    for out, data, page in built:
+        out.write_bytes(data)
         print('Wrote %s (%.1f kB)' % (out.relative_to(ROOT), len(data) / 1024))
         print('SHA-256 %s  %s' % (hashlib.sha256(data).hexdigest(), out.name))
 

@@ -75,13 +75,18 @@ function clearDone() {
 	if (generateStatusShown) say('');
 }
 
-ui.algorithm.addEventListener('click', function (e) {
-	algorithm = algorithm === 'v1' ? 'v2' : 'v1';
-	this.textContent = algorithm;
-	this.classList.toggle('v2', algorithm === 'v2');
-	this.setAttribute('aria-label', 'Algorithm ' + algorithm + ' (click to switch)');
+function setAlgorithm(next) {
+	if (next === algorithm) return;
+	algorithm = next;
+	ui.algorithm.textContent = algorithm;
+	ui.algorithm.classList.toggle('v2', algorithm === 'v2');
+	ui.algorithm.setAttribute('aria-label', 'Algorithm ' + algorithm + ' (click to switch)');
 	ui['alg-hint'].textContent = ALG_HINTS[algorithm];
 	clearDone();
+}
+
+ui.algorithm.addEventListener('click', function (e) {
+	setAlgorithm(algorithm === 'v1' ? 'v2' : 'v1');
 });
 
 ui['toggle-mp'].addEventListener('click', function (e) {
@@ -176,6 +181,55 @@ ui.iter.addEventListener('change', function () {
 	clearDone();
 });
 
+// --- session hygiene ----------------------------------------------------
+//
+// Forget the master password (and any finished result) after a period of
+// inactivity, and shortly after the tab has been hidden.  This limits what
+// a walk-away or a shared screen can expose; it is not a defence against
+// malware on the device.  Set a value to 0 to disable that rule.
+
+const IDLE_MS = 5 * 60 * 1000;
+const HIDDEN_MS = 60 * 1000;
+let idleTimer = null;
+let hiddenTimer = null;
+
+function wipeSecrets(reason) {
+	if (busy) {
+		// Let a running derivation finish, then look again.
+		setTimeout(function () { wipeSecrets(reason); }, 5000);
+		return;
+	}
+	if (!ui.mp.value && pw === null) return;
+	ui.mp.value = '';
+	ui.mp.type = 'password';
+	ui['toggle-mp'].textContent = 'show';
+	clearDone();
+	say(reason);
+}
+
+function armIdleTimer() {
+	clearTimeout(idleTimer);
+	if (IDLE_MS > 0) {
+		idleTimer = setTimeout(function () {
+			wipeSecrets('Master password cleared after ' + Math.round(IDLE_MS / 60000) + ' minutes of inactivity.');
+		}, IDLE_MS);
+	}
+}
+
+['keydown', 'pointerdown', 'input', 'focusin'].forEach(function (type) {
+	document.addEventListener(type, armIdleTimer, { passive: true });
+});
+armIdleTimer();
+
+document.addEventListener('visibilitychange', function () {
+	clearTimeout(hiddenTimer);
+	if (document.visibilityState === 'hidden' && HIDDEN_MS > 0) {
+		hiddenTimer = setTimeout(function () {
+			wipeSecrets('Master password cleared because this tab was in the background.');
+		}, HIDDEN_MS);
+	}
+});
+
 // --- import -------------------------------------------------------------
 
 ui.import.addEventListener('click', function () {
@@ -262,11 +316,29 @@ function populateDatalists(vault) {
 	}
 }
 
+// Apply the algorithm the backup recorded for this service.  A wrong
+// algorithm silently produces a different (wrong) password, so when the
+// backup has no v1/v2 entry for the service, leave the toggle alone and say so.
+function applyImportedAlgorithm(service) {
+	const recorded = importedVault.algorithms && importedVault.algorithms[service];
+	if (recorded === 'v1' || recorded === 'v2') {
+		setAlgorithm(recorded);
+		return;
+	}
+	say(
+		'This backup records no v1/v2 algorithm for "' + service +
+			'". Check the v1/v2 toggle (currently ' + algorithm + ').',
+		false,
+		true
+	);
+}
+
 function maybeAutofillFromImport() {
 	if (!importedVault) return;
 	const service = ui.service.value;
 	const record = importedVault.services[service];
 	if (!record) return;
+	applyImportedAlgorithm(service);
 	const users = Object.keys(record);
 	if (users.length === 0) return;
 	if (!ui.user.value) ui.user.value = users[0];
@@ -278,6 +350,7 @@ function maybeAutofillIter() {
 	if (!importedVault) return;
 	const record = importedVault.services[ui.service.value];
 	if (!record) return;
+	applyImportedAlgorithm(ui.service.value);
 	const iter = record[ui.user.value];
 	if (iter !== undefined) ui.iter.value = String(iter);
 }
