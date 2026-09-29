@@ -1,0 +1,4 @@
+# The built pages are verified byte-for-byte by SHA-256.  Never let git
+# convert their line endings on checkin or checkout.
+/index.html -text
+/about.html -text

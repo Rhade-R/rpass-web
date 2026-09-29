@@ -1,141 +1,181 @@
 #!/usr/bin/env python3
 """
-Build a self-contained copy of the rpass web app.
+Build the self-contained pages of the rpass web app.
 
-Produces dist/rpass.html: the HTML with every stylesheet, script, and
-image inlined. The result has no external dependencies, so it can be
-saved once and used offline, and it can be verified with a single
-SHA-256 of the file.
-
-The CSP in the single-file build permits 'unsafe-inline' for scripts
-and styles (they are inline). This is the trade-off for portability;
-the multi-file build keeps the strict CSP plus SRI.
-
-USAGE
     python scripts/build-single-file.py
+
+Reads the multi-file sources in src/ and writes, at the repository root:
+
+    index.html   <- src/main.htm    (the app: verify this file's SHA-256)
+    about.html   <- src/about.htm
+
+Every stylesheet, script, font and image is inlined, so each output is a
+single file that can be hashed, saved, and used offline.
+
+The output is deterministic.  Sources are read with universal newlines and
+the result is written as UTF-8 with LF line endings, so identical sources
+give identical bytes (and an identical SHA-256) on Windows, macOS and Linux.
+
+The single-file CSP permits 'unsafe-inline' for scripts and styles, because
+they are inline; the multi-file sources keep the strict 'self' policy.
 """
 
 import base64
+import hashlib
+import html as htmllib
 import re
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / 'main.htm'
-OUT = ROOT / 'dist' / 'rpass.html'
+SRC = ROOT / 'src'
+
+MAIN_CSP_SOURCE = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; "
+    "img-src 'self' data:; connect-src 'none'; form-action 'none'; "
+    "base-uri 'none'"
+)
+# font-src is required: fonts fall back to default-src ('none' here), and
+# the Hack font is inlined as a data: URI.
+MAIN_CSP_SINGLE = (
+    "default-src 'none'; script-src 'unsafe-inline'; "
+    "style-src 'unsafe-inline'; img-src data:; font-src data:; "
+    "connect-src 'none'; form-action 'none'; base-uri 'none'"
+)
+ABOUT_CSP_SOURCE = (
+    "default-src 'self'; style-src 'self'; img-src 'self' data:; "
+    "base-uri 'none'; form-action 'none'"
+)
+ABOUT_CSP_SINGLE = (
+    "default-src 'none'; style-src 'unsafe-inline'; img-src data:; "
+    "font-src data:; base-uri 'none'; form-action 'none'"
+)
+
+PAGES = [
+    {
+        'src': 'main.htm',
+        'out': 'index.html',
+        'csp': (MAIN_CSP_SOURCE, MAIN_CSP_SINGLE),
+        'links': [('href="./about.htm"', 'href="about.html"')],
+    },
+    {
+        'src': 'about.htm',
+        'out': 'about.html',
+        'csp': (ABOUT_CSP_SOURCE, ABOUT_CSP_SINGLE),
+        'links': [('href="main.htm"', 'href="index.html"')],
+    },
+]
+
+MIME = {
+    '.woff2': 'font/woff2',
+    '.woff': 'font/woff',
+    '.ttf': 'font/ttf',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+}
 
 
-def to_data_uri(path, mime):
-    data = path.read_bytes()
-    return f'data:{mime};base64,{base64.b64encode(data).decode("ascii")}'
+def fail(msg):
+    sys.exit('build error: ' + msg)
+
+
+def to_data_uri(path):
+    mime = MIME.get(path.suffix.lower())
+    if not mime:
+        fail('no MIME type known for %s' % path)
+    data = base64.b64encode(path.read_bytes()).decode('ascii')
+    return 'data:%s;base64,%s' % (mime, data)
 
 
 def inline_css_urls(css, base_dir):
     def repl(match):
-        url = match.group(1).strip('\'"')
-        # strip cache-busting query, if any
-        url = url.split('?', 1)[0]
+        url = match.group(1).strip().strip('\'"')
+        if url.startswith('data:'):
+            return match.group(0)
+        url = url.split('?', 1)[0]  # cache-busting query
         target = (base_dir / url).resolve()
-        if not target.exists():
-            return match.group(0)
-        ext = target.suffix.lower()
-        mime = {
-            '.woff2': 'font/woff2',
-            '.woff': 'font/woff',
-            '.ttf': 'font/ttf',
-            '.svg': 'image/svg+xml',
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-        }.get(ext)
-        if not mime:
-            return match.group(0)
-        return f'url("{to_data_uri(target, mime)}")'
+        if not target.is_file():
+            fail('CSS references a missing file: %s' % url)
+        return 'url("%s")' % to_data_uri(target)
+
     return re.sub(r'url\(([^)]+)\)', repl, css)
 
 
-def main():
-    if not SRC.exists():
-        sys.exit(f"Run from the web repo root (main.htm not found).")
-    OUT.parent.mkdir(parents=True, exist_ok=True)
+def build(page):
+    src = SRC / page['src']
+    if not src.is_file():
+        fail('%s not found (run from the repository root)' % src)
+    html = src.read_text(encoding='utf-8')  # universal newlines -> LF
 
-    html = SRC.read_text(encoding='utf-8')
-
-    # Inline stylesheets.
     def link_repl(match):
-        attrs = match.group(0)
-        href_m = re.search(r'href="([^"]+)"', attrs)
-        if not href_m:
-            return attrs
-        path = ROOT / href_m.group(1)
-        if not path.exists():
-            return attrs
+        m = re.search(r'href="([^"]+)"', match.group(0))
+        if not m:
+            fail('stylesheet <link> without href: %s' % match.group(0))
+        path = SRC / m.group(1)
+        if not path.is_file():
+            fail('missing stylesheet: %s' % m.group(1))
         css = inline_css_urls(path.read_text(encoding='utf-8'), path.parent)
-        return f'<style>\n{css}\n</style>'
+        return '<style>\n%s\n</style>' % css
 
-    html = re.sub(
-        r'<link\b[^>]*rel="stylesheet"[^>]*>',
-        link_repl,
-        html,
-        flags=re.IGNORECASE,
-    )
+    html = re.sub(r'<link\b[^>]*rel="stylesheet"[^>]*>', link_repl, html, flags=re.I)
 
-    # Inline scripts.
     def script_repl(match):
-        src_m = re.search(r'src="([^"]+)"', match.group(0))
-        if not src_m:
-            return match.group(0)
-        path = ROOT / src_m.group(1)
-        if not path.exists():
-            return match.group(0)
+        m = re.search(r'\bsrc="([^"]+)"', match.group(0))
+        path = SRC / m.group(1)
+        if not path.is_file():
+            fail('missing script: %s' % m.group(1))
         js = path.read_text(encoding='utf-8')
-        # Guard against accidental '</script>' inside the source.
         js = js.replace('</script>', '<\\/script>')
-        return f'<script>\n{js}\n</script>'
+        return '<script>\n%s\n</script>' % js
 
-    html = re.sub(
-        r'<script\b[^>]*src="[^"]+"[^>]*></script>',
-        script_repl,
-        html,
-        flags=re.IGNORECASE,
-    )
+    html = re.sub(r'<script\b[^>]*\bsrc="[^"]+"[^>]*></script>', script_repl, html, flags=re.I)
 
-    # Inline images.
     def img_repl(match):
-        src = match.group(1)
-        path = ROOT / src
-        if not path.exists():
-            return match.group(0)
-        mime = {
-            '.svg': 'image/svg+xml',
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-        }.get(path.suffix.lower())
-        if not mime:
-            return match.group(0)
-        return f'src="{to_data_uri(path, mime)}"'
+        path = SRC / match.group(2)
+        if not path.is_file():
+            fail('missing image: %s' % match.group(2))
+        return match.group(1) + to_data_uri(path) + match.group(3)
 
-    html = re.sub(r'src="([^":]+\.(?:svg|png|jpe?g))"', img_repl, html)
+    html = re.sub(r'(<img\b[^>]*?\bsrc=")([^":]+)(")', img_repl, html)
 
-    # Loosen the CSP for the inline payload.
-    html = html.replace(
-        "default-src 'self'; script-src 'self'; style-src 'self'; "
-        "img-src 'self' data:; connect-src 'none'; form-action 'none'; "
-        "base-uri 'none'",
-        "default-src 'none'; script-src 'unsafe-inline'; "
-        "style-src 'unsafe-inline'; img-src data:; connect-src 'none'; "
-        "form-action 'none'; base-uri 'none'",
-    )
+    for old, new in page['links']:
+        if old not in html:
+            fail('%s: expected link %s not found' % (page['src'], old))
+        html = html.replace(old, new)
 
-    OUT.write_text(html, encoding='utf-8')
-    size_kb = OUT.stat().st_size / 1024
-    print(f"Wrote {OUT} ({size_kb:.1f} kB)")
+    csp_old, csp_new = page['csp']
+    if csp_old not in html:
+        fail('%s: source CSP not found; the single-file CSP would not apply' % page['src'])
+    html = html.replace(csp_old, csp_new)
 
-    # Print the SHA-256 so the user can record it.
-    import hashlib
-    digest = hashlib.sha256(OUT.read_bytes()).hexdigest()
-    print(f"SHA-256: {digest}")
+    problems = []
+    if re.search(r'<script\b[^>]*\bsrc=', html, re.I):
+        problems.append('external <script src=...> remains')
+    if re.search(r'<link\b[^>]*rel="stylesheet"', html, re.I):
+        problems.append('external stylesheet remains')
+    for m in re.finditer(r'<img\b[^>]*\bsrc="([^"]*)"', html):
+        if not m.group(1).startswith('data:'):
+            problems.append('non-inline image: %s' % m.group(1))
+    for style in re.findall(r'<style>(.*?)</style>', html, re.S):
+        for u in re.findall(r'url\(([^)]*)\)', style):
+            if not u.strip('\'"').startswith('data:'):
+                problems.append('non-inline CSS url(): %s' % u[:60])
+    if problems:
+        fail('%s: %s' % (page['src'], '; '.join(problems)))
+
+    out = ROOT / page['out']
+    data = html.encode('utf-8')
+    out.write_bytes(data)
+    return out, data
+
+
+def main():
+    for page in PAGES:
+        out, data = build(page)
+        print('Wrote %s (%.1f kB)' % (out.relative_to(ROOT), len(data) / 1024))
+        print('SHA-256 %s  %s' % (hashlib.sha256(data).hexdigest(), out.name))
 
 
 if __name__ == '__main__':

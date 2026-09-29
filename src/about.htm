@@ -1,15 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 	<head>
 		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+		<title>About rpass</title>
 		<link href="assets/ss/main.css" rel="stylesheet">
 		<link href="assets/font/Hack/hack.css" rel="stylesheet">
 	</head>
 	<body>
+		<p><a href="main.htm">&larr; rpass</a></p>
 		<h1>Yet another strong password generator</h1>
-		<div class="iframe-container">
-			<iframe id="odysee-iframe" width="560" height="315" src="https://odysee.com/$/embed/Edward-Snowden-on-Passwords_-Last-Week-Tonight-with-John-Oliver-%28HBO%29/2d25c9c637ee3197bfe0a1d94da3b8fc9e72fbe4?r=9vjMz1jzB2KHUahc7BEb41vhgHvrmFPF" allowfullscreen></iframe>
-		</div>
+		<p>Video: <a href="https://odysee.com/$/embed/Edward-Snowden-on-Passwords_-Last-Week-Tonight-with-John-Oliver-%28HBO%29/2d25c9c637ee3197bfe0a1d94da3b8fc9e72fbe4?r=9vjMz1jzB2KHUahc7BEb41vhgHvrmFPF" rel="noopener noreferrer">Edward Snowden on Passwords (Last Week Tonight with John Oliver)</a> (opens odysee.com)</p>
 		<p>Summing up, passwords:</p>
 		<ul>
 			<li>should be long</li>
@@ -29,6 +31,7 @@
 		<p>When it comes to managing passwords, there are many solutions out there, each with its own pros and cons. None of them are perfect, but using even the most minimally well-made password manager application or add-on is far better than reusing bad passwords, from a security standpoint. They make managing passwords a viable choice for even an average, non-tech-savvy, relatively busy human being. I hope John is using one of these by now.</p>
 		<h2>Introducing <sup>r</sup>pass</h2>
 		<p>This solution is not a password manager, but a password generator. It uses a state-of-the-art hash function (or more precisely, a key-derivation function) named Scrypt, to generate, as of this writing, fifty-character-long passwords composed of a combination of 95 printable ASCII characters. Passwords generated this way are therefore impervious to dictionary attacks, since they typically do not resemble any even remotely intelligible information, and impossible to bruteforce by modern computers in a reasonable amount of time. In fact, <sup>r</sup>pass can theoretically generate up to 95<sup>50</sup> different passwords, which is roughly 7.69x10<sup>98</sup> (or 769 followed by 96 zeros). The Sun will literally turn into a Red Giant and engulf this planet long before any computer finishes trying out that many combinations.</p>
+		<p>Two caveats. The figures above describe the original (v1) algorithm; v2 produces 32 characters from a 76-character alphabet, without spaces. And the size of the output space is not the same as the effort needed to attack it: someone who learns one generated password, together with the service name and username, can try guessing your master password offline against scrypt. The strength of your master password is what ultimately protects all the rest, so make it long and unique.</p>
 
 		<p>Moreover, hash functions, or key-derivation functions, are one-way algorithms, meaning they cannot be reversed to figure out the input (your master password and username) from the output (the hash, or password in this case), somewhat in the same way the exact addends of a regular summation of an arbitrary number of addends cannot be figured out from the sum.</p>
 

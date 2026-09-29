@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta name="referrer" content="no-referrer">
+		<title>rpass</title>
+		<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+		<link href="assets/ss/main.css" rel="stylesheet">
+		<link href="assets/font/Hack/hack.css" rel="stylesheet">
+		<script src="assets/js/frame-bust.js"></script>
+	</head>
+	<body class="col">
+		<noscript><p>rpass needs JavaScript to derive passwords. Everything runs locally in this page; nothing is sent anywhere.</p></noscript>
+		<form id="main" class="col">
+			<img src="assets/svg/rpass.svg" alt="rpass">
+			<div class="row">
+				<input id="mp" type="password" placeholder="master password" aria-label="Master password" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" value="" required>
+				<button id="toggle-mp" type="button" aria-controls="mp">show</button>
+			</div>
+			<input id="service" type="text" placeholder="service name (e.g. github)" aria-label="Service name" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="" required list="services-list">
+			<datalist id="services-list"></datalist>
+			<input id="user" type="text" placeholder="username" aria-label="Username" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="" required list="users-list">
+			<datalist id="users-list"></datalist>
+			<div class="row">
+				<input id="iter" type="text" inputmode="numeric" placeholder="variant" aria-label="Variant (optional whole number)" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="">
+				<button id="algorithm" type="button" aria-describedby="alg-hint" aria-label="Algorithm v1 (click to switch)">v1</button>
+			</div>
+			<p id="alg-hint" class="hint">v1 (legacy): 50 printable ASCII characters, may include spaces.</p>
+			<button id="generate" type="submit"><span>Generate</span></button>
+			<p id="status" class="status" role="status" aria-live="polite"></p>
+			<div class="row">
+				<button id="import" type="button">Import backup</button>
+				<input type="file" id="import-file" accept=".json,application/json" hidden>
+			</div>
+		</form>
+		<footer class="row" hidden>
+			<a href="./about.htm">About</a>
+			<a id="copyright" href="https://github.com/Rhade-R/rpass-web/raw/main/COPYING.txt">&copy; Rhade</a>
+			<a href="https://github.com/Rhade-R/rpass-web">Github</a>
+		</footer>
+
+		<script src="assets/js/lib/scrypt/scrypt-async.min.js"></script>
+		<script src="assets/js/derive.js"></script>
+		<script src="assets/js/vault.js"></script>
+		<script src="assets/js/main.js"></script>
+	</body>
+</html>

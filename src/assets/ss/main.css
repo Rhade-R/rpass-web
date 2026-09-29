@@ -30,11 +30,10 @@ body {
 	min-height: 100vh;
 	padding: 1em;
 }
-body *:not(div):not(img):not(sup) {
+body *:not(div):not(img):not(sup):not(form) {
 	border-radius: 8px;
 	margin: 0.25em;
 	padding: 0.25em;
-	transform: scaleY(0.9);
 }
 button {
 	cursor: pointer;
@@ -50,7 +49,6 @@ button:active {
 	outline: 1px solid var(--button-bgc);
 	background: var(--button-focus-bgc);
 }
-button:enabled span:after {content: 'Generate';}
 button:disabled {background: var(--transp);}
 button:disabled span:after {
 	animation-name: genFXa;
@@ -83,42 +81,18 @@ input:focus:not(#host) {
 }
 .col {flex-flow: column wrap;}
 .row {flex-flow: row nowrap;}
-.blurred {filter: blur(6px);}
 .done {background: var(--success-bgc);}
-.done:not(:active) span:after{content: 'Copy to clipboard';}
-.done:active span:after{content: 'Copied!';}
 .done:hover {background: var(--success-hover-bgc);}
 .done:active {
 	background: var(--success-focus-bgc);
 	outline: 1px solid var(--success-bgc);
-}
-.iframe-container {
-  overflow: hidden;
-  /* 16:9 aspect ratio */
-  padding-top: 56.25%;
-  position: relative;
-}
-.iframe-container iframe {
-   border: 0;
-   height: 100%;
-   left: 0;
-   position: absolute;
-   top: 0;
-   width: 100%;
 }
 #main {
 	width: 100%;
 	max-width: 25em;
 	align-items: stretch;
 }
-#service, #user, #iter {flex: auto;}
-#version:after {
-	top: 0;
-	left: 100;
-	right: 0;
-	bottom: 100;
-	position: fixed;
-}
+#mp, #service, #user, #iter {flex: auto;}
 @keyframes genFXa {
 	0%   {content: '0101010101';}
 	5%   {content: 'G010101010';}
@@ -143,7 +117,6 @@ input:focus:not(#host) {
 	100% {content: '1010101010';}
 }
 
-[cont]::after {content: attr(cont);}
 
 /* Algorithm toggle. Sits below the iter input and mirrors the
    extension's badge: outline only, blue for v1, green for v2. */
@@ -180,19 +153,60 @@ input:focus:not(#host) {
 /* Import button. Secondary action, so it mirrors the #algorithm
    badge treatment (outline only, blue). The generate button keeps
    the solid background as the primary action. */
-#import {
+#import,
+#toggle-mp {
 	background: var(--transp);
 	outline: 1px solid var(--button-bgc);
 	color: var(--button-bgc);
 	font-weight: 700;
 	font-size: 0.9em;
 }
-#import:hover {
+#import:hover,
+#toggle-mp:hover {
 	background: var(--button-hover-bgc);
 	color: #FFF;
 	outline-color: var(--button-hover-bgc);
 }
-#import:active {
+#import:active,
+#toggle-mp:active {
 	background: var(--button-focus-bgc);
 	outline-color: var(--button-focus-bgc);
+}
+
+/* --- Form status, focus, contrast ------------------------------------- */
+
+.hint, .status {
+	color: #BBB;
+	font-size: 0.85em;
+	text-align: center;
+	text-align-last: center;
+}
+.status {min-height: 1.5em;}
+.status.error {color: #F88;}
+
+/* White on #69C is 3.0:1 and white on #0F0 is 1.4:1; WCAG AA wants 4.5:1
+   for text this size.  Dark text on the light fills, white on the dark ones. */
+button {
+	color: #000;
+	text-shadow: none;
+}
+button:hover,
+button:active,
+button:disabled {color: #FFF;}
+.done,
+.done:hover,
+.done:active {color: #000;}
+
+/* The universal rule above removes outlines; keep a keyboard focus ring. */
+:focus-visible {
+	outline: 2px solid #FFF !important;
+	outline-offset: 2px;
+}
+
+/* No scrambling text animation for users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+	button:disabled span:after {
+		animation: none;
+		content: 'Generating...';
+	}
 }
