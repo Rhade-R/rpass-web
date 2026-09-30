@@ -200,13 +200,25 @@ ui.iter.addEventListener('change', function () {
 //    the `secret` variable, not in an input: the master password field shows
 //    only bullets.  An extension's content script shares the page's DOM but
 //    not its JavaScript variables, so it cannot read the password from here.
+//  * Every cell carries a coordinate label (column letter then row number,
+//    like "B3" or "J10"). The coordinate is shown in both states: centred
+//    when the keys are hidden, small in a corner when they are visible. A
+//    user who peeks can write a coordinate down or hold it in mind and
+//    type it later without another peek.
+//  * A cell whose character is already part of the master password gets a
+//    pick indicator (a translucent fill and a thick inner border), so a
+//    character that appears more than once can be found again at a glance.
 //  * Keys are hidden by default and a press on a hidden key types it.
-//    "Peek" shows the keys after OSK_REVEAL_DELAY_MS for OSK_PEEK_MS.  A
-//    press that BEGINS while the keys are visible (or just after they were
-//    hidden) types nothing: it reshuffles the layout, hides the labels for
-//    another OSK_REVEAL_DELAY_MS, and adds OSK_EXTEND_MS, capped at
-//    OSK_MAX_VISIBLE_MS per continuous reveal.  The layout is shuffled when
-//    the keyboard opens and at no other time.
+//    "Peek" shows the keys after OSK_REVEAL_DELAY_MS for OSK_PEEK_MS.
+//    While the keys are visible, ANY input event -- a pointer press
+//    anywhere, or a printable / Enter / Backspace key press -- reshuffles
+//    the layout, hides the labels for another OSK_REVEAL_DELAY_MS, and
+//    adds OSK_EXTEND_MS, capped at OSK_MAX_VISIBLE_MS per continuous
+//    reveal. This is the point: the defence against a screenshot taken on
+//    click is that no click ever happens while a stable mapping from
+//    coordinates to characters is on screen. The layout is shuffled when
+//    the keyboard opens (unless a password is already partly typed) and
+//    on every such input event.
 //  * A press is judged by the state when it begins, and a reveal is held
 //    back while any press is in progress.  There is no "hide now" button:
 //    it would be a press made while the labels are visible.
@@ -232,6 +244,12 @@ const OSK_LETTER_GROUPS = ['eta', 'oin', 'shrd', 'lcum', 'wfgy', 'pbvk', 'jxqz']
 const OSK_GROUP_COLORS = ['#FFFFFF', '#F0E442', '#E69F00', '#56B4E9', '#CC79A7', '#009E73', '#D55E00'];
 const OSK_OTHER_COLOR = '#999999';
 const OSK_BORDER_COLOR = '#6699CC';
+// Pick indicator for cells whose character is already in `secret`.
+// Cyan is not used by any OSK_LETTER_GROUPS entry, so it never
+// collides with a character's own colour.
+const OSK_PICKED_COLOR = '#00E5FF';
+const OSK_PICKED_FILL = 'rgba(0, 229, 255, 0.25)';
+const OSK_PICKED_STROKE_WIDTH = 3;
 
 let oskState = 'hidden'; // 'hidden' | 'revealing' | 'visible'
 let oskLayout = [];
@@ -271,6 +289,17 @@ function keyColor(c) {
 		if (OSK_LETTER_GROUPS[i].indexOf(lower) !== -1) return OSK_GROUP_COLORS[i];
 	}
 	return OSK_OTHER_COLOR;
+}
+
+// Cell coordinate, like "B3" or "J10": column letter then row number,
+// left to right and top to bottom, both starting at 1. Not a secret
+// (it names a position, not a character), but stable for the session,
+// so a user can write it down or hold it in mind between a peek and
+// a press.
+function cellName(index) {
+	const col = index % OSK_COLS;
+	const row = Math.floor(index / OSK_COLS);
+	return String.fromCharCode(65 + col) + String(row + 1);
 }
 
 // --- where the master password lives ---
@@ -327,20 +356,56 @@ function renderOsk() {
 	ctx.clearRect(0, 0, side, side);
 	const cell = side / OSK_COLS;
 	const show = oskState === 'visible';
-	ctx.lineWidth = 1;
-	ctx.strokeStyle = OSK_BORDER_COLOR;
+	// Characters already in `secret`. A Set, not a count: the marker
+	// answers "has this character been used", so a repeat is found
+	// again without tracking how many times it has been pressed.
+	const picked = new Set(secret);
 	ctx.textAlign = 'center';
 	ctx.textBaseline = 'middle';
 	oskLayout.forEach(function (c, index) {
 		const x = (index % OSK_COLS) * cell;
 		const y = Math.floor(index / OSK_COLS) * cell;
+		const isPicked = picked.has(c);
+
+		// Pick indicator fill, behind the character.
+		if (isPicked) {
+			ctx.fillStyle = OSK_PICKED_FILL;
+			ctx.fillRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
+		}
+
+		// Outer cell border.
+		ctx.strokeStyle = OSK_BORDER_COLOR;
+		ctx.lineWidth = 1;
 		ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
+
+		// Pick indicator: thick inner stroke.
+		if (isPicked) {
+			const inset = OSK_PICKED_STROKE_WIDTH + 1.5;
+			ctx.strokeStyle = OSK_PICKED_COLOR;
+			ctx.lineWidth = OSK_PICKED_STROKE_WIDTH;
+			ctx.strokeRect(x + inset, y + inset, cell - 2 * inset, cell - 2 * inset);
+		}
+
 		if (show) {
 			const label = c === ' ' ? 'space' : c;
 			ctx.font = 'bold ' + (c === ' ' ? Math.floor(cell * 0.28) : Math.floor(cell * 0.5)) +
 				'px Hack, Consolas, monospace';
 			ctx.fillStyle = keyColor(c);
 			ctx.fillText(label, x + cell / 2, y + cell / 2);
+
+			// Coordinate, small, top-right corner.
+			ctx.font = Math.floor(cell * 0.22) + 'px Hack, Consolas, monospace';
+			ctx.fillStyle = '#BBB';
+			ctx.textAlign = 'right';
+			ctx.textBaseline = 'top';
+			ctx.fillText(cellName(index), x + cell - 4, y + 4);
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+		} else {
+			// Hidden: coordinate centred, no character.
+			ctx.font = 'bold ' + Math.floor(cell * 0.4) + 'px Hack, Consolas, monospace';
+			ctx.fillStyle = '#BBB';
+			ctx.fillText(cellName(index), x + cell / 2, y + cell / 2);
 		}
 	});
 }
@@ -362,7 +427,7 @@ function updateOskState() {
 	ui['osk-state'].classList.toggle('visible', visible);
 	if (visible) {
 		const s = Math.max(0, Math.ceil((oskDeadline - Date.now()) / 1000));
-		ui['osk-state'].textContent = 'KEYS VISIBLE (' + s + ' s): presses type nothing, reshuffle the keys and add ' +
+		ui['osk-state'].textContent = 'KEYS VISIBLE (' + s + ' s): any tap or key reshuffles the keys and adds ' +
 			OSK_EXTEND_MS / 1000 + ' s.';
 	} else if (oskState === 'revealing') {
 		ui['osk-state'].textContent = 'Showing keys\u2026';
@@ -430,8 +495,11 @@ function oskPeek() {
 		updateOskState();
 		oskRevealTimer = setTimeout(function () { oskReveal(false); }, OSK_REVEAL_DELAY_MS);
 	} else if (oskState === 'visible') {
-		oskExtend();
-		updateOskState();
+		// A peek while the keys are up is a click like any other, so it
+		// reshuffles rather than silently extending the window: a screen
+		// capture taken during the previous window must not still match
+		// the layout now on screen.
+		oskBurn();
 	}
 }
 
@@ -457,25 +525,33 @@ function openOsk() {
 	if (!keyboardMode) enterKeyboardMode();
 	oskStopTimers();
 	oskPress = null;
-	oskLayout = shuffleInPlace(OSK_CHARS.slice());
+	// Reshuffle only when there is no password in progress. If the
+	// user closes the OSK mid-entry and reopens it, the layout they
+	// were working from (and any coordinates they wrote down) stays
+	// valid for the rest of the session.
+	if (!secret) oskLayout = shuffleInPlace(OSK_CHARS.slice());
 	oskState = 'hidden';
 	oskHiddenAt = -Infinity;
 	renderOsk();
 	updateOskState();
-	oskPeek(); // start with a look at the fresh layout
+	oskPeek();
 }
 
 function closeOsk() {
 	oskStopTimers();
 	oskPress = null;
 	oskState = 'hidden';
-	oskLayout = [];
-	renderOsk(); // clears the canvas while it still has a size
 	updateOskState();
 	ui.osk.hidden = true;
 	ui['toggle-osk'].setAttribute('aria-expanded', 'false');
 	ui['toggle-osk'].classList.remove('on');
-	if (!secret) leaveKeyboardMode();
+	// A partly-typed password keeps its layout (and keyboard mode) so
+	// that reopening resumes where the user left off. Only a fresh
+	// session releases the layout and exits keyboard mode.
+	if (!secret) {
+		oskLayout = [];
+		leaveKeyboardMode();
+	}
 }
 
 ui['toggle-osk'].addEventListener('click', function () {
@@ -524,6 +600,24 @@ function finishOskPress(e, cancelled) {
 
 ui['osk-canvas'].addEventListener('pointerup', function (e) { finishOskPress(e, false); });
 ui['osk-canvas'].addEventListener('pointercancel', function (e) { finishOskPress(e, true); });
+
+// Any input event while the layout is visible invalidates it: a screenshot
+// triggered by that event must not be pairable with the layout the user
+// was looking at. Capture phase, so nothing downstream can suppress it.
+// This closes the peek-while-visible shortcut (a tap on the peek button,
+// which used to extend the window silently) and covers tap-to-wake on
+// mobile, backspace, clear, and any other button on the page.
+document.addEventListener('pointerdown', function () {
+	if (!ui.osk.hidden && oskState === 'visible') oskBurn();
+}, true);
+
+// Matching guard for physical key presses. Modifier-only keys, Tab,
+// arrows and function keys are not input events for this purpose; a
+// printable character, Enter or Backspace is.
+document.addEventListener('keydown', function (e) {
+	if (ui.osk.hidden || oskState !== 'visible') return;
+	if (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace') oskBurn();
+}, true);
 
 // Leaving the tab hides the keys at once.
 document.addEventListener('visibilitychange', function () {
