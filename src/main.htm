@@ -17,6 +17,20 @@
 			<div class="row">
 				<input id="mp" type="password" placeholder="master password" aria-label="Master password" autocomplete="new-password" autocapitalize="none" autocorrect="off" spellcheck="false" value="" required>
 				<button id="toggle-mp" type="button" aria-controls="mp">show</button>
+				<button id="toggle-osk" type="button" aria-controls="osk" aria-expanded="false">keyboard</button>
+			</div>
+			<div id="osk" hidden role="group" aria-label="On-screen keyboard">
+				<p class="hint">Keys are typed into the master password field. ASCII characters only.</p>
+				<div id="osk-keys" class="osk-grid"></div>
+				<div class="row">
+					<button id="osk-back" class="osk-ctl" type="button">backspace</button>
+					<button id="osk-clear" class="osk-ctl" type="button">clear</button>
+				</div>
+				<div class="row">
+					<button id="osk-conceal" class="osk-ctl" type="button" aria-pressed="true">hide keys while pressed</button>
+					<button id="osk-shuffle" class="osk-ctl" type="button" aria-pressed="true">shuffle after each key</button>
+				</div>
+				<p class="hint">Protects against keystroke loggers only. Malware that records the screen can still see what you press.</p>
 			</div>
 			<input id="service" type="text" placeholder="service name (e.g. github)" aria-label="Service name" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="" required list="services-list">
 			<datalist id="services-list"></datalist>

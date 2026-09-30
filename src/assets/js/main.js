@@ -105,6 +105,13 @@ ui.main.addEventListener('submit', function (e) {
 		return;
 	}
 
+	// A read-only field (on-screen keyboard open) is exempt from the
+	// browser's `required` check, so check here as well.
+	if (!ui.mp.value) {
+		say('Enter your master password first.', true);
+		return;
+	}
+
 	busy = true;
 	const startKey = inputKey();
 	ui.generate.disabled = true;
@@ -179,6 +186,163 @@ ui.iter.addEventListener('input', clearDone);
 ui.iter.addEventListener('change', function () {
 	this.value = RpassDerive.normalizeIter(this.value);
 	clearDone();
+});
+
+// --- on-screen keyboard -------------------------------------------------
+//
+// An optional in-page keyboard for entering the master password on a device
+// whose physical keyboard you do not trust.  It types into the same #mp
+// field, so nothing else in the app changes.
+//
+//  * It defeats loggers that only see keystrokes (hardware or software).
+//  * It does NOT defeat malware that records the screen, or that takes a
+//    screenshot between two key presses and also logs click positions, or
+//    anything running inside the browser.
+//  * "Hide keys while pressed" blanks every label from pointerdown until
+//    OSK_REVEAL_MS after release.  It is a race against the browser's next
+//    repaint, so it can only help against a capture taken slightly after
+//    the press.
+//  * "Shuffle after each key" re-randomises the layout so a click position
+//    alone says nothing.  Without it, blank keys still give the key away
+//    through the cursor position.
+//  * ASCII only.
+
+const OSK_REVEAL_MS = 250;
+const OSK_GROUPS = [
+	'abcdefghijklmnopqrstuvwxyz',
+	'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+	'0123456789',
+	'!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~',
+	' '
+];
+
+let oskConceal = true;
+let oskShuffle = true;
+let oskViaPointer = false;
+let oskRevealTimer = null;
+
+// Unbiased random integer in [0, n).
+function randomInt(n) {
+	const limit = Math.floor(0x100000000 / n) * n;
+	const buf = new Uint32Array(1);
+	let x;
+	do {
+		crypto.getRandomValues(buf);
+		x = buf[0];
+	} while (x >= limit);
+	return x % n;
+}
+
+function shuffleInPlace(a) {
+	for (let i = a.length - 1; i > 0; i--) {
+		const j = randomInt(i + 1);
+		const t = a[i];
+		a[i] = a[j];
+		a[j] = t;
+	}
+	return a;
+}
+
+function renderOsk() {
+	const chars = OSK_GROUPS.join('').split('');
+	if (oskShuffle) shuffleInPlace(chars);
+	const focused = document.activeElement && document.activeElement.oskChar;
+	let refocus = null;
+	ui['osk-keys'].innerHTML = '';
+	chars.forEach(function (c) {
+		const key = document.createElement('button');
+		key.type = 'button';
+		key.classList.add('osk-key');
+		key.textContent = c === ' ' ? 'space' : c;
+		if (c === ' ') {
+			key.classList.add('osk-space');
+			key.setAttribute('aria-label', 'space');
+		}
+		key.oskChar = c;
+		// Keep keyboard focus on the same character across a reshuffle.
+		if (c === focused && !oskViaPointer) refocus = key;
+		ui['osk-keys'].appendChild(key);
+	});
+	if (refocus) refocus.focus();
+}
+
+function concealKeys() {
+	clearTimeout(oskRevealTimer);
+	ui['osk-keys'].classList.add('concealed');
+}
+
+function revealKeys() {
+	clearTimeout(oskRevealTimer);
+	ui['osk-keys'].classList.remove('concealed');
+}
+
+function setPressed(button, on) {
+	button.setAttribute('aria-pressed', String(on));
+}
+
+setPressed(ui['osk-conceal'], oskConceal);
+setPressed(ui['osk-shuffle'], oskShuffle);
+
+ui['toggle-osk'].addEventListener('click', function () {
+	const open = ui.osk.hidden;
+	ui.osk.hidden = !open;
+	this.setAttribute('aria-expanded', String(open));
+	this.classList.toggle('on', open);
+	// Read-only is meant to keep phones from raising the system keyboard
+	// (not verified in a real browser).
+	ui.mp.readOnly = open;
+	revealKeys();
+	if (open) renderOsk();
+	else ui['osk-keys'].innerHTML = '';
+});
+
+ui.osk.addEventListener('pointerdown', function (e) {
+	oskViaPointer = true;
+	if (oskConceal && e.target.oskChar !== undefined) concealKeys();
+});
+
+ui.osk.addEventListener('keydown', function () {
+	oskViaPointer = false;
+});
+
+function onPointerEnd() {
+	if (!ui['osk-keys'].classList.contains('concealed')) return;
+	clearTimeout(oskRevealTimer);
+	oskRevealTimer = setTimeout(revealKeys, OSK_REVEAL_MS);
+}
+document.addEventListener('pointerup', onPointerEnd);
+document.addEventListener('pointercancel', onPointerEnd);
+
+// The character is typed on click (release), so keyboard activation works
+// too, and the layout only changes after the press is complete.
+ui['osk-keys'].addEventListener('click', function (e) {
+	const c = e.target.oskChar;
+	if (c === undefined) return;
+	ui.mp.value += c;
+	clearDone();
+	if (oskShuffle) renderOsk();
+});
+
+ui['osk-back'].addEventListener('click', function () {
+	ui.mp.value = Array.from(ui.mp.value).slice(0, -1).join('');
+	clearDone();
+});
+
+ui['osk-clear'].addEventListener('click', function () {
+	ui.mp.value = '';
+	clearDone();
+});
+
+ui['osk-conceal'].addEventListener('click', function () {
+	oskConceal = !oskConceal;
+	setPressed(this, oskConceal);
+	if (!oskConceal) revealKeys();
+});
+
+ui['osk-shuffle'].addEventListener('click', function () {
+	oskShuffle = !oskShuffle;
+	setPressed(this, oskShuffle);
+	renderOsk();
 });
 
 // --- session hygiene ----------------------------------------------------
