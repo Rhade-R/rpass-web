@@ -20,17 +20,14 @@
 				<button id="toggle-osk" type="button" aria-controls="osk" aria-expanded="false">keyboard</button>
 			</div>
 			<div id="osk" hidden role="group" aria-label="On-screen keyboard">
-				<p class="hint">Keys are typed into the master password field. ASCII characters only.</p>
-				<div id="osk-keys" class="osk-grid"></div>
+				<p id="osk-state" class="hint osk-state"></p>
+				<canvas id="osk-canvas" width="300" height="300"></canvas>
 				<div class="row">
+					<button id="osk-peek" class="osk-ctl" type="button">peek</button>
 					<button id="osk-back" class="osk-ctl" type="button">backspace</button>
 					<button id="osk-clear" class="osk-ctl" type="button">clear</button>
 				</div>
-				<div class="row">
-					<button id="osk-conceal" class="osk-ctl" type="button" aria-pressed="true">hide keys while pressed</button>
-					<button id="osk-shuffle" class="osk-ctl" type="button" aria-pressed="true">shuffle after each key</button>
-				</div>
-				<p class="hint">Protects against keystroke loggers only. Malware that records the screen can still see what you press.</p>
+				<p class="hint">Keys are hidden while you type. Peek shows them for 10 s. A press while they are visible types nothing, reshuffles the keys and adds 10 s. Protects against keystroke loggers and extensions reading the page, not against screen-recording malware.</p>
 			</div>
 			<input id="service" type="text" placeholder="service name (e.g. github)" aria-label="Service name" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="" required list="services-list">
 			<datalist id="services-list"></datalist>
@@ -48,6 +45,7 @@
 				<input type="file" id="import-file" accept=".json,application/json" hidden>
 			</div>
 		</form>
+		<p id="local-hint" class="hint">Safer: <a id="save-copy" href="main.htm" download="rpass.html">save a copy of this page</a>, check its SHA-256 against the <a href="https://github.com/Rhade-R/rpass-web/releases">release</a>, and open it from your disk, ideally in a private window. Extensions usually cannot access local files or private windows unless you allow it.</p>
 		<footer class="row" hidden>
 			<a href="./about.htm">About</a>
 			<a id="copyright" href="https://github.com/Rhade-R/rpass-web/raw/main/COPYING.txt">&copy; Rhade</a>

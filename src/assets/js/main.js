@@ -34,6 +34,8 @@ let importedVault = null;
 let busy = false;
 let resetTimer = null;
 let generateStatusShown = false;
+let secret = '';           // master password while the on-screen keyboard is in use
+let keyboardMode = false;  // true: the master password lives in `secret`, not in the page
 
 // This script is loaded at the end of <body>, so the DOM is ready.
 ui.copyright.textContent = cr;
@@ -56,7 +58,7 @@ function isDone() {
 // Everything a derivation depends on, normalised the way derive.js does.
 function inputKey() {
 	return [
-		ui.mp.value,
+		getMasterPassword(),
 		RpassDerive.normalizeIdentifier(ui.service.value),
 		RpassDerive.normalizeIdentifier(ui.user.value),
 		RpassDerive.normalizeIter(ui.iter.value),
@@ -107,7 +109,7 @@ ui.main.addEventListener('submit', function (e) {
 
 	// A read-only field (on-screen keyboard open) is exempt from the
 	// browser's `required` check, so check here as well.
-	if (!ui.mp.value) {
+	if (!getMasterPassword()) {
 		say('Enter your master password first.', true);
 		return;
 	}
@@ -120,7 +122,7 @@ ui.main.addEventListener('submit', function (e) {
 	say('Generating\u2026', false, true);
 
 	RpassDerive.derive(
-		ui.mp.value,
+		getMasterPassword(),
 		ui.service.value,
 		ui.user.value,
 		ui.iter.value,
@@ -191,35 +193,55 @@ ui.iter.addEventListener('change', function () {
 // --- on-screen keyboard -------------------------------------------------
 //
 // An optional in-page keyboard for entering the master password on a device
-// whose physical keyboard you do not trust.  It types into the same #mp
-// field, so nothing else in the app changes.
+// whose physical keyboard, or browser extensions, you do not trust.
 //
-//  * It defeats loggers that only see keystrokes (hardware or software).
-//  * It does NOT defeat malware that records the screen, or that takes a
-//    screenshot between two key presses and also logs click positions, or
-//    anything running inside the browser.
-//  * "Hide keys while pressed" blanks every label from pointerdown until
-//    OSK_REVEAL_MS after release.  It is a race against the browser's next
-//    repaint, so it can only help against a capture taken slightly after
-//    the press.
-//  * "Shuffle after each key" re-randomises the layout so a click position
-//    alone says nothing.  Without it, blank keys still give the key away
-//    through the cursor position.
-//  * ASCII only.
+//  * The keys are drawn on a <canvas>.  No element, text, class or attribute
+//    names a key's character or colour, and the typed characters are kept in
+//    the `secret` variable, not in an input: the master password field shows
+//    only bullets.  An extension's content script shares the page's DOM but
+//    not its JavaScript variables, so it cannot read the password from here.
+//  * Keys are hidden by default and a press on a hidden key types it.
+//    "Peek" shows the keys after OSK_REVEAL_DELAY_MS for OSK_PEEK_MS.  A
+//    press that BEGINS while the keys are visible (or just after they were
+//    hidden) types nothing: it reshuffles the layout, hides the labels for
+//    another OSK_REVEAL_DELAY_MS, and adds OSK_EXTEND_MS, capped at
+//    OSK_MAX_VISIBLE_MS per continuous reveal.  The layout is shuffled when
+//    the keyboard opens and at no other time.
+//  * A press is judged by the state when it begins, and a reveal is held
+//    back while any press is in progress.  There is no "hide now" button:
+//    it would be a press made while the labels are visible.
+//
+// This does NOT defend against malware that records the screen (a capture
+// during a peek plus later click positions decodes everything), a script
+// running in the page's own world, or clipboard access.  ASCII only.
 
-const OSK_REVEAL_MS = 250;
-const OSK_GROUPS = [
-	'abcdefghijklmnopqrstuvwxyz',
-	'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-	'0123456789',
-	'!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~',
-	' '
-];
+const OSK_COLS = 10;
+const OSK_PEEK_MS = 10000;
+const OSK_EXTEND_MS = 10000;
+const OSK_MAX_VISIBLE_MS = 60000;
+const OSK_REVEAL_DELAY_MS = 400;
+const OSK_SETTLE_MS = 150;
 
-let oskConceal = true;
-let oskShuffle = true;
-let oskViaPointer = false;
+const OSK_CHARS = Array.from({ length: 95 }, function (_, i) {
+	return String.fromCharCode(32 + i);
+});
+
+// Letters by English frequency (Lewand), most common first, 3-4 per colour.
+// Okabe-Ito palette plus white, brightest = most common; all >= 5.4:1 on black.
+const OSK_LETTER_GROUPS = ['eta', 'oin', 'shrd', 'lcum', 'wfgy', 'pbvk', 'jxqz'];
+const OSK_GROUP_COLORS = ['#FFFFFF', '#F0E442', '#E69F00', '#56B4E9', '#CC79A7', '#009E73', '#D55E00'];
+const OSK_OTHER_COLOR = '#999999';
+const OSK_BORDER_COLOR = '#6699CC';
+
+let oskState = 'hidden'; // 'hidden' | 'revealing' | 'visible'
+let oskLayout = [];
+let oskHiddenAt = -Infinity;
+let oskVisibleSince = 0;
+let oskDeadline = 0;
+let oskHideTimer = null;
 let oskRevealTimer = null;
+let oskTickTimer = null;
+let oskPress = null; // { pointerId, index, kind: 'type' | 'burn' | 'ignore' }
 
 // Unbiased random integer in [0, n).
 function randomInt(n) {
@@ -243,107 +265,281 @@ function shuffleInPlace(a) {
 	return a;
 }
 
+function keyColor(c) {
+	const lower = c.toLowerCase();
+	for (let i = 0; i < OSK_LETTER_GROUPS.length; i++) {
+		if (OSK_LETTER_GROUPS[i].indexOf(lower) !== -1) return OSK_GROUP_COLORS[i];
+	}
+	return OSK_OTHER_COLOR;
+}
+
+// --- where the master password lives ---
+
+function getMasterPassword() {
+	return keyboardMode ? secret : ui.mp.value;
+}
+
+function setSecret(value) {
+	secret = value;
+	ui.mp.value = '\u2022'.repeat(Array.from(secret).length);
+	clearDone();
+}
+
+function enterKeyboardMode() {
+	keyboardMode = true;
+	secret = '';
+	ui.mp.value = '';
+	ui.mp.type = 'text';
+	ui.mp.readOnly = true;
+	ui.mp.title = 'Filled with the on-screen keyboard. Open the keyboard to edit.';
+	ui['toggle-mp'].textContent = 'show';
+	ui['toggle-mp'].disabled = true;
+	clearDone();
+	say('Keyboard mode: the master password is kept in memory, not in the page.');
+}
+
+function leaveKeyboardMode() {
+	keyboardMode = false;
+	secret = '';
+	ui.mp.value = '';
+	ui.mp.type = 'password';
+	ui.mp.readOnly = false;
+	ui.mp.removeAttribute('title');
+	ui['toggle-mp'].disabled = false;
+	clearDone();
+}
+
+// --- drawing and hit-testing ---
+
 function renderOsk() {
-	const chars = OSK_GROUPS.join('').split('');
-	if (oskShuffle) shuffleInPlace(chars);
-	const focused = document.activeElement && document.activeElement.oskChar;
-	let refocus = null;
-	ui['osk-keys'].innerHTML = '';
-	chars.forEach(function (c) {
-		const key = document.createElement('button');
-		key.type = 'button';
-		key.classList.add('osk-key');
-		key.textContent = c === ' ' ? 'space' : c;
-		if (c === ' ') {
-			key.classList.add('osk-space');
-			key.setAttribute('aria-label', 'space');
+	const canvas = ui['osk-canvas'];
+	const side = Math.floor(canvas.getBoundingClientRect().width);
+	if (side <= 0) return;
+	const dpr = window.devicePixelRatio || 1;
+	const px = Math.round(side * dpr);
+	canvas.style.height = side + 'px';
+	if (canvas.width !== px || canvas.height !== px) {
+		canvas.width = px;
+		canvas.height = px;
+	}
+	const ctx = canvas.getContext('2d');
+	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+	ctx.clearRect(0, 0, side, side);
+	const cell = side / OSK_COLS;
+	const show = oskState === 'visible';
+	ctx.lineWidth = 1;
+	ctx.strokeStyle = OSK_BORDER_COLOR;
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+	oskLayout.forEach(function (c, index) {
+		const x = (index % OSK_COLS) * cell;
+		const y = Math.floor(index / OSK_COLS) * cell;
+		ctx.strokeRect(x + 1.5, y + 1.5, cell - 3, cell - 3);
+		if (show) {
+			const label = c === ' ' ? 'space' : c;
+			ctx.font = 'bold ' + (c === ' ' ? Math.floor(cell * 0.28) : Math.floor(cell * 0.5)) +
+				'px Hack, Consolas, monospace';
+			ctx.fillStyle = keyColor(c);
+			ctx.fillText(label, x + cell / 2, y + cell / 2);
 		}
-		key.oskChar = c;
-		// Keep keyboard focus on the same character across a reshuffle.
-		if (c === focused && !oskViaPointer) refocus = key;
-		ui['osk-keys'].appendChild(key);
 	});
-	if (refocus) refocus.focus();
 }
 
-function concealKeys() {
+function oskCell(e) {
+	const rect = ui['osk-canvas'].getBoundingClientRect();
+	if (!rect.width) return -1;
+	const size = rect.width / OSK_COLS;
+	const col = Math.floor((e.clientX - rect.left) / size);
+	const row = Math.floor((e.clientY - rect.top) / size);
+	if (col < 0 || col >= OSK_COLS || row < 0) return -1;
+	const index = row * OSK_COLS + col;
+	return index < oskLayout.length ? index : -1;
+}
+
+function updateOskState() {
+	const visible = oskState === 'visible';
+	ui['osk-canvas'].classList.toggle('visible', visible);
+	ui['osk-state'].classList.toggle('visible', visible);
+	if (visible) {
+		const s = Math.max(0, Math.ceil((oskDeadline - Date.now()) / 1000));
+		ui['osk-state'].textContent = 'KEYS VISIBLE (' + s + ' s): presses type nothing, reshuffle the keys and add ' +
+			OSK_EXTEND_MS / 1000 + ' s.';
+	} else if (oskState === 'revealing') {
+		ui['osk-state'].textContent = 'Showing keys\u2026';
+	} else {
+		ui['osk-state'].textContent = 'Keys hidden: presses type. Press peek to see them.';
+	}
+}
+
+// --- visibility state machine ---
+
+function oskStopTimers() {
+	clearTimeout(oskHideTimer);
 	clearTimeout(oskRevealTimer);
-	ui['osk-keys'].classList.add('concealed');
+	clearInterval(oskTickTimer);
+	oskHideTimer = null;
+	oskRevealTimer = null;
+	oskTickTimer = null;
 }
 
-function revealKeys() {
-	clearTimeout(oskRevealTimer);
-	ui['osk-keys'].classList.remove('concealed');
+function oskScheduleHide() {
+	clearTimeout(oskHideTimer);
+	oskHideTimer = setTimeout(oskHide, Math.max(0, oskDeadline - Date.now()));
 }
 
-function setPressed(button, on) {
-	button.setAttribute('aria-pressed', String(on));
+function oskHide() {
+	oskStopTimers();
+	oskState = 'hidden';
+	oskHiddenAt = Date.now();
+	renderOsk();
+	updateOskState();
 }
 
-setPressed(ui['osk-conceal'], oskConceal);
-setPressed(ui['osk-shuffle'], oskShuffle);
+function oskReveal(resume) {
+	if (oskPress) {
+		// Never bring the labels up under a finger.
+		oskRevealTimer = setTimeout(function () { oskReveal(resume); }, 50);
+		return;
+	}
+	const now = Date.now();
+	if (resume) {
+		if (now >= oskDeadline) {
+			oskHide();
+			return;
+		}
+	} else {
+		oskVisibleSince = now;
+		oskDeadline = now + OSK_PEEK_MS;
+	}
+	oskState = 'visible';
+	oskScheduleHide();
+	if (!oskTickTimer) oskTickTimer = setInterval(updateOskState, 250);
+	renderOsk();
+	updateOskState();
+}
+
+function oskExtend() {
+	oskDeadline = Math.min(oskDeadline + OSK_EXTEND_MS, oskVisibleSince + OSK_MAX_VISIBLE_MS);
+	oskScheduleHide();
+}
+
+function oskPeek() {
+	if (ui.osk.hidden) return;
+	if (oskState === 'hidden') {
+		oskState = 'revealing';
+		updateOskState();
+		oskRevealTimer = setTimeout(function () { oskReveal(false); }, OSK_REVEAL_DELAY_MS);
+	} else if (oskState === 'visible') {
+		oskExtend();
+		updateOskState();
+	}
+}
+
+// A press that began while labels were (or might still have been) on screen.
+function oskBurn() {
+	oskLayout = shuffleInPlace(OSK_CHARS.slice());
+	if (oskState === 'visible') {
+		oskExtend();
+		oskState = 'revealing';
+		clearTimeout(oskRevealTimer);
+		oskRevealTimer = setTimeout(function () { oskReveal(true); }, OSK_REVEAL_DELAY_MS);
+	}
+	renderOsk();
+	updateOskState();
+}
+
+// --- open / close ---
+
+function openOsk() {
+	ui.osk.hidden = false;
+	ui['toggle-osk'].setAttribute('aria-expanded', 'true');
+	ui['toggle-osk'].classList.add('on');
+	if (!keyboardMode) enterKeyboardMode();
+	oskStopTimers();
+	oskPress = null;
+	oskLayout = shuffleInPlace(OSK_CHARS.slice());
+	oskState = 'hidden';
+	oskHiddenAt = -Infinity;
+	renderOsk();
+	updateOskState();
+	oskPeek(); // start with a look at the fresh layout
+}
+
+function closeOsk() {
+	oskStopTimers();
+	oskPress = null;
+	oskState = 'hidden';
+	oskLayout = [];
+	renderOsk(); // clears the canvas while it still has a size
+	updateOskState();
+	ui.osk.hidden = true;
+	ui['toggle-osk'].setAttribute('aria-expanded', 'false');
+	ui['toggle-osk'].classList.remove('on');
+	if (!secret) leaveKeyboardMode();
+}
 
 ui['toggle-osk'].addEventListener('click', function () {
-	const open = ui.osk.hidden;
-	ui.osk.hidden = !open;
-	this.setAttribute('aria-expanded', String(open));
-	this.classList.toggle('on', open);
-	// Read-only is meant to keep phones from raising the system keyboard
-	// (not verified in a real browser).
-	ui.mp.readOnly = open;
-	revealKeys();
-	if (open) renderOsk();
-	else ui['osk-keys'].innerHTML = '';
+	if (ui.osk.hidden) openOsk();
+	else closeOsk();
 });
 
-ui.osk.addEventListener('pointerdown', function (e) {
-	oskViaPointer = true;
-	if (oskConceal && e.target.oskChar !== undefined) concealKeys();
-});
-
-ui.osk.addEventListener('keydown', function () {
-	oskViaPointer = false;
-});
-
-function onPointerEnd() {
-	if (!ui['osk-keys'].classList.contains('concealed')) return;
-	clearTimeout(oskRevealTimer);
-	oskRevealTimer = setTimeout(revealKeys, OSK_REVEAL_MS);
-}
-document.addEventListener('pointerup', onPointerEnd);
-document.addEventListener('pointercancel', onPointerEnd);
-
-// The character is typed on click (release), so keyboard activation works
-// too, and the layout only changes after the press is complete.
-ui['osk-keys'].addEventListener('click', function (e) {
-	const c = e.target.oskChar;
-	if (c === undefined) return;
-	ui.mp.value += c;
-	clearDone();
-	if (oskShuffle) renderOsk();
-});
+ui['osk-peek'].addEventListener('click', oskPeek);
 
 ui['osk-back'].addEventListener('click', function () {
-	ui.mp.value = Array.from(ui.mp.value).slice(0, -1).join('');
-	clearDone();
+	setSecret(Array.from(secret).slice(0, -1).join(''));
 });
 
 ui['osk-clear'].addEventListener('click', function () {
-	ui.mp.value = '';
-	clearDone();
+	setSecret('');
 });
 
-ui['osk-conceal'].addEventListener('click', function () {
-	oskConceal = !oskConceal;
-	setPressed(this, oskConceal);
-	if (!oskConceal) revealKeys();
+// --- presses on the canvas ---
+
+ui['osk-canvas'].addEventListener('pointerdown', function (e) {
+	if (oskPress) return;
+	if (e.pointerType === 'mouse' && e.button !== 0) return;
+	let kind;
+	if (oskState === 'visible' || Date.now() - oskHiddenAt < OSK_SETTLE_MS) kind = 'burn';
+	else if (oskState === 'revealing') kind = 'ignore';
+	else kind = 'type';
+	oskPress = { pointerId: e.pointerId, index: oskCell(e), kind: kind };
+	try {
+		ui['osk-canvas'].setPointerCapture(e.pointerId);
+	} catch (err) {
+		// synthetic or already-released pointer: nothing to capture
+	}
 });
 
-ui['osk-shuffle'].addEventListener('click', function () {
-	oskShuffle = !oskShuffle;
-	setPressed(this, oskShuffle);
-	renderOsk();
+function finishOskPress(e, cancelled) {
+	const press = oskPress;
+	if (!press || press.pointerId !== e.pointerId) return;
+	oskPress = null;
+	if (press.index < 0) return;
+	if (press.kind === 'burn') {
+		oskBurn();
+	} else if (press.kind === 'type' && !cancelled && oskCell(e) === press.index) {
+		setSecret(secret + oskLayout[press.index]);
+	}
+}
+
+ui['osk-canvas'].addEventListener('pointerup', function (e) { finishOskPress(e, false); });
+ui['osk-canvas'].addEventListener('pointercancel', function (e) { finishOskPress(e, true); });
+
+// Leaving the tab hides the keys at once.
+document.addEventListener('visibilitychange', function () {
+	if (document.visibilityState === 'hidden' && !ui.osk.hidden && oskState !== 'hidden') oskHide();
 });
+
+window.addEventListener('resize', function () {
+	if (!ui.osk.hidden) renderOsk();
+});
+
+// --- local copy reminder ---
+//
+// Private browsing is deliberately not detected: the tricks are a moving
+// target that browsers keep closing, and a false "you are private" would hide
+// a reminder that is still needed.  file: is reliable.
+ui['local-hint'].hidden = location.protocol === 'file:';
 
 // --- session hygiene ----------------------------------------------------
 //
@@ -363,10 +559,14 @@ function wipeSecrets(reason) {
 		setTimeout(function () { wipeSecrets(reason); }, 5000);
 		return;
 	}
-	if (!ui.mp.value && pw === null) return;
-	ui.mp.value = '';
-	ui.mp.type = 'password';
-	ui['toggle-mp'].textContent = 'show';
+	if (!getMasterPassword() && pw === null) return;
+	if (keyboardMode) {
+		setSecret('');
+	} else {
+		ui.mp.value = '';
+		ui.mp.type = 'password';
+		ui['toggle-mp'].textContent = 'show';
+	}
 	clearDone();
 	say(reason);
 }
@@ -425,7 +625,7 @@ ui['import-file'].addEventListener('change', async function (e) {
 		return;
 	}
 
-	if (typeof stored._enc_ === 'string' && !ui.mp.value) {
+	if (typeof stored._enc_ === 'string' && !getMasterPassword()) {
 		say('This backup is encrypted. Enter your master password above, then click Import backup again.', true);
 		ui.mp.focus();
 		return;
@@ -435,7 +635,7 @@ ui['import-file'].addEventListener('change', async function (e) {
 	say('Decrypting backup\u2026');
 	let payload;
 	try {
-		payload = await RpassVault.load(stored, ui.mp.value);
+		payload = await RpassVault.load(stored, getMasterPassword());
 	} catch (err) {
 		if (err && err.message === 'wrong-password') {
 			say('Wrong master password for this backup.', true);

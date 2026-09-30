@@ -64,7 +64,9 @@ PAGES = [
         'src': 'main.htm',
         'out': 'index.html',
         'csp': (MAIN_CSP_SOURCE, MAIN_CSP_SINGLE),
-        'links': [('href="./about.htm"', 'href="about.html"')],
+        'links': [('href="./about.htm"', 'href="about.html"'),
+                  ('href="main.htm" download="rpass.html"',
+                   'href="index.html" download="rpass.html"')],
     },
     {
         'src': 'about.htm',

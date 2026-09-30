@@ -222,8 +222,7 @@ button:disabled {color: #FFF;}
 /* --- On-screen keyboard ----------------------------------------------- */
 
 #toggle-osk,
-.osk-ctl,
-.osk-key {
+.osk-ctl {
 	background: var(--transp);
 	outline: 1px solid var(--button-bgc);
 	color: var(--button-bgc);
@@ -231,29 +230,26 @@ button:disabled {color: #FFF;}
 	font-size: 0.9em;
 }
 #toggle-osk:hover,
-.osk-ctl:hover,
-.osk-key:hover {
+.osk-ctl:hover {
 	background: var(--button-hover-bgc);
 	color: #FFF;
 	outline-color: var(--button-hover-bgc);
 }
 #toggle-osk:active,
-.osk-ctl:active,
-.osk-key:active {
+.osk-ctl:active {
 	background: var(--button-focus-bgc);
 	outline-color: var(--button-focus-bgc);
 }
-/* "on" / toggled-on state: solid fill with dark text (7.0:1 on #69C). */
-#toggle-osk.on,
-.osk-ctl[aria-pressed="true"] {
+/* "on" state: solid fill with dark text (7.0:1 on #69C). */
+#toggle-osk.on {
 	background: var(--button-bgc);
 	color: #000;
 }
-#toggle-osk.on:hover,
-.osk-ctl[aria-pressed="true"]:hover {
+#toggle-osk.on:hover {
 	background: var(--button-hover-bgc);
 	color: #FFF;
 }
+#toggle-mp:disabled {opacity: 0.4;}
 
 #osk {
 	display: flex;
@@ -263,32 +259,24 @@ button:disabled {color: #FFF;}
 #osk[hidden] {display: none;}
 .osk-ctl {flex: 1;}
 
-.osk-grid {
-	display: grid;
-	grid-template-columns: repeat(10, minmax(0, 1fr));
-	gap: 0.2em;
-	margin: 0.25em;
-}
-.osk-key {
-	margin: 0;
-	padding: 0.4em 0;
-	border-radius: 6px;
+/* Keys are drawn on the canvas (see main.js); ids beat the generic
+   margin/padding/radius rule for non-div elements. */
+#osk-canvas {
+	display: block;
+	width: 100%;
+	margin: 0.25em 0;
+	padding: 0;
+	border-radius: 0;
+	touch-action: manipulation;
 	-webkit-user-select: none;
 	user-select: none;
-	touch-action: manipulation;
+	outline: 1px solid #009E73;
 }
-.osk-space {grid-column: span 3;}
+#osk-canvas.visible {outline: 2px solid #E69F00;}
+.osk-state {min-height: 2.6em;}
+.osk-state.visible {color: #E69F00;}
 
-/* Hide keys while pressed: labels vanish and hover/pressed highlights are
-   neutralised, so no key looks different from any other. */
-.osk-grid.concealed .osk-key,
-.osk-grid.concealed .osk-key:hover,
-.osk-grid.concealed .osk-key:active {
-	background: var(--transp);
-	color: transparent;
-	text-shadow: none;
-	outline: 1px solid var(--button-bgc);
-}
+#local-hint {max-width: 25em;}
 
 </style>
 		<style>
