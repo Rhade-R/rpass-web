@@ -278,6 +278,41 @@ button:disabled {color: #FFF;}
 
 #local-hint {max-width: 25em;}
 
+/* --- Migration state (from an imported backup) ----------------------- */
+
+.migration-badge {
+	flex: 0 0 auto;
+	font-size: 0.75em;
+	font-weight: 700;
+	min-width: 4.5em;
+	padding: 0.25em 0.4em;
+	margin: 0.25em;
+	border-radius: 8px;
+	background: var(--transp);
+	outline: 1px solid var(--button-bgc);
+	color: var(--button-bgc);
+	text-shadow: none;
+}
+
+.migration-badge.pending {
+	outline-color: #FB4;
+	color: #FB4;
+}
+
+.migration-badge.migrated {
+	outline-color: var(--success-bgc);
+	color: var(--success-bgc);
+}
+
+.import-notice {
+	color: #FB4;
+	font-size: 0.8em;
+	font-weight: 700;
+	text-align: center;
+	text-align-last: center;
+	line-height: 1.35;
+}
+
 </style>
 		<style>
 /*!
@@ -319,6 +354,8 @@ button:disabled {color: #FFF;}
 		<h2>Introducing <sup>r</sup>pass</h2>
 		<p>This solution is not a password manager, but a password generator. It uses a state-of-the-art hash function (or more precisely, a key-derivation function) named Scrypt, to generate, as of this writing, fifty-character-long passwords composed of a combination of 95 printable ASCII characters. Passwords generated this way are therefore impervious to dictionary attacks, since they typically do not resemble any even remotely intelligible information, and impossible to bruteforce by modern computers in a reasonable amount of time. In fact, <sup>r</sup>pass can theoretically generate up to 95<sup>50</sup> different passwords, which is roughly 7.69x10<sup>98</sup> (or 769 followed by 96 zeros). The Sun will literally turn into a Red Giant and engulf this planet long before any computer finishes trying out that many combinations.</p>
 		<p>Two caveats. The figures above describe the original (v1) algorithm; v2 produces 32 characters from a 76-character alphabet, without spaces. And the size of the output space is not the same as the effort needed to attack it: someone who learns one generated password, together with the service name and username, can try guessing your master password offline against scrypt. The strength of your master password is what ultimately protects all the rest, so make it long and unique.</p>
+
+		<p>The Firefox extension offers an opt-in breach check for the master password during setup. That check is not available here. This page is designed to run from anywhere, including from hosts you do not control, and its content-security policy forbids outgoing network requests.</p>
 
 		<p>Moreover, hash functions, or key-derivation functions, are one-way algorithms, meaning they cannot be reversed to figure out the input (your master password and username) from the output (the hash, or password in this case), somewhat in the same way the exact addends of a regular summation of an arbitrary number of addends cannot be figured out from the sum.</p>
 

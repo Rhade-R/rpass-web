@@ -170,24 +170,36 @@ function copyPassword() {
 ui.mp.addEventListener('change', clearDone);
 ui.mp.addEventListener('input', clearDone);
 
-ui.service.addEventListener('input', clearDone);
+ui.service.addEventListener('input', function () {
+	clearDone();
+	updateMigrationBadge();
+});
 ui.service.addEventListener('change', function () {
 	this.value = RpassDerive.normalizeIdentifier(this.value);
 	clearDone();
 	maybeAutofillFromImport();
+	updateMigrationBadge();
 });
 
-ui.user.addEventListener('input', clearDone);
+ui.user.addEventListener('input', function () {
+	clearDone();
+	updateMigrationBadge();
+});
 ui.user.addEventListener('change', function () {
 	this.value = RpassDerive.normalizeIdentifier(this.value);
 	clearDone();
 	maybeAutofillIter();
+	updateMigrationBadge();
 });
 
-ui.iter.addEventListener('input', clearDone);
+ui.iter.addEventListener('input', function () {
+	clearDone();
+	updateMigrationBadge();
+});
 ui.iter.addEventListener('change', function () {
 	this.value = RpassDerive.normalizeIter(this.value);
 	clearDone();
+	updateMigrationBadge();
 });
 
 // --- on-screen keyboard -------------------------------------------------
@@ -747,6 +759,20 @@ ui['import-file'].addEventListener('change', async function (e) {
 	importedVault = payload;
 	populateDatalists(payload);
 	say('Backup imported. Service and username suggestions are now available in their fields.');
+
+	// A version mismatch is a persistent condition of this page's
+	// state, not a transient status line, so it lives in its own
+	// element and stays visible until a new import replaces it.
+	const versionWarning = RpassVault.checkVersion(stored);
+	if (versionWarning) {
+		ui['import-notice'].textContent = '\u26a0 ' + versionWarning;
+		ui['import-notice'].hidden = false;
+	} else {
+		ui['import-notice'].hidden = true;
+		ui['import-notice'].textContent = '';
+	}
+
+	updateMigrationBadge();
 });
 
 function populateDatalists(vault) {
@@ -802,6 +828,10 @@ function maybeAutofillFromImport() {
 	if (!ui.user.value) ui.user.value = users[0];
 	const iter = record[ui.user.value];
 	if (iter !== undefined) ui.iter.value = String(iter);
+	// `ui.user.value` was set programmatically, which does not fire
+	// a `change` event; refresh the badge here so it reflects the
+	// newly-selected user.
+	updateMigrationBadge();
 }
 
 function maybeAutofillIter() {
@@ -811,6 +841,37 @@ function maybeAutofillIter() {
 	applyImportedAlgorithm(ui.service.value);
 	const iter = record[ui.user.value];
 	if (iter !== undefined) ui.iter.value = String(iter);
+	updateMigrationBadge();
+}
+
+// Per-pair migration state of the currently-selected account, taken
+// from the imported backup. Shown only while a backup carrying a
+// non-empty `migration` map is loaded and both fields are filled.
+// Outside of that window the badge is hidden, matching the web
+// app's stateless-and-boring default.
+function updateMigrationBadge() {
+	const badge = ui['migration-badge'];
+	if (!badge) return;
+	if (!importedVault || !importedVault.migration) {
+		badge.hidden = true;
+		return;
+	}
+	const svc = RpassDerive.normalizeIdentifier(ui.service.value);
+	const usr = RpassDerive.normalizeIdentifier(ui.user.value);
+	if (!svc || !usr) {
+		badge.hidden = true;
+		return;
+	}
+	const entry = importedVault.migration[svc];
+	const status = (entry && entry[usr]) || 'pending';
+	badge.hidden = false;
+	badge.textContent = status;
+	badge.classList.toggle('migrated', status === 'migrated');
+	badge.classList.toggle('pending', status === 'pending');
+	badge.title =
+		status === 'migrated'
+			? 'Backup recorded this account as migrated to the new master password'
+			: 'Backup recorded this account as still on the previous master password';
 }
 
 // --- clipboard ----------------------------------------------------------

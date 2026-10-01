@@ -36,6 +36,7 @@
 			<div class="row">
 				<input id="iter" type="text" inputmode="numeric" placeholder="variant" aria-label="Variant (optional whole number)" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="">
 				<button id="algorithm" type="button" aria-describedby="alg-hint" aria-label="Algorithm v1 (click to switch)">v1</button>
+				<span id="migration-badge" class="migration-badge" hidden></span>
 			</div>
 			<p id="alg-hint" class="hint">v1 (legacy): 50 printable ASCII characters, may include spaces.</p>
 			<button id="generate" type="submit"><span>Generate</span></button>
@@ -44,6 +45,7 @@
 				<button id="import" type="button">Import backup</button>
 				<input type="file" id="import-file" accept=".json,application/json" hidden>
 			</div>
+			<p id="import-notice" class="import-notice" hidden></p>
 		</form>
 		<p id="local-hint" class="hint">Safer: <a id="save-copy" href="main.htm" download="rpass.html">save a copy of this page</a>, check its SHA-256 against the <a href="https://github.com/Rhade-R/rpass-web/releases">release</a>, and open it from your disk, ideally in a private window. Extensions usually cannot access local files or private windows unless you allow it.</p>
 		<footer class="row" hidden>

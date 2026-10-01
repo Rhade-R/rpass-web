@@ -279,6 +279,41 @@ button:disabled {color: #FFF;}
 
 #local-hint {max-width: 25em;}
 
+/* --- Migration state (from an imported backup) ----------------------- */
+
+.migration-badge {
+	flex: 0 0 auto;
+	font-size: 0.75em;
+	font-weight: 700;
+	min-width: 4.5em;
+	padding: 0.25em 0.4em;
+	margin: 0.25em;
+	border-radius: 8px;
+	background: var(--transp);
+	outline: 1px solid var(--button-bgc);
+	color: var(--button-bgc);
+	text-shadow: none;
+}
+
+.migration-badge.pending {
+	outline-color: #FB4;
+	color: #FB4;
+}
+
+.migration-badge.migrated {
+	outline-color: var(--success-bgc);
+	color: var(--success-bgc);
+}
+
+.import-notice {
+	color: #FB4;
+	font-size: 0.8em;
+	font-weight: 700;
+	text-align: center;
+	text-align-last: center;
+	line-height: 1.35;
+}
+
 </style>
 		<style>
 /*!
@@ -348,6 +383,7 @@ if (window.top !== window.self) {
 			<div class="row">
 				<input id="iter" type="text" inputmode="numeric" placeholder="variant" aria-label="Variant (optional whole number)" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" value="">
 				<button id="algorithm" type="button" aria-describedby="alg-hint" aria-label="Algorithm v1 (click to switch)">v1</button>
+				<span id="migration-badge" class="migration-badge" hidden></span>
 			</div>
 			<p id="alg-hint" class="hint">v1 (legacy): 50 printable ASCII characters, may include spaces.</p>
 			<button id="generate" type="submit"><span>Generate</span></button>
@@ -356,6 +392,7 @@ if (window.top !== window.self) {
 				<button id="import" type="button">Import backup</button>
 				<input type="file" id="import-file" accept=".json,application/json" hidden>
 			</div>
+			<p id="import-notice" class="import-notice" hidden></p>
 		</form>
 		<p id="local-hint" class="hint">Safer: <a id="save-copy" href="index.html" download="rpass.html">save a copy of this page</a>, check its SHA-256 against the <a href="https://github.com/Rhade-R/rpass-web/releases">release</a>, and open it from your disk, ideally in a private window. Extensions usually cannot access local files or private windows unless you allow it.</p>
 		<footer class="row" hidden>
@@ -519,6 +556,16 @@ const RpassVault = (function () {
 		encoding: undefined
 	};
 
+	/*
+	 * Highest vault format version this page knows how to interpret.
+	 * Bump in lockstep with the extension when a new format version
+	 * lands. A backup whose `_v_` exceeds this may carry fields this
+	 * page would silently misread (or miss entirely), so the importer
+	 * warns — it does not refuse. Silent wrong passwords are the
+	 * failure mode being guarded against.
+	 */
+	const KNOWN_VAULT_VERSION = 6;
+
 	function base64ToBytes(b64) {
 		const binary = atob(b64);
 		const bytes = new Uint8Array(binary.length);
@@ -619,6 +666,28 @@ const RpassVault = (function () {
 		};
 	}
 
+	/**
+	 * Return a human-readable warning if the stored vault declares a
+	 * format version higher than this page understands, or `null` if
+	 * it looks fine. A missing `_v_` is version 1 and never warns.
+	 */
+	function checkVersion(stored) {
+		if (!stored || typeof stored !== 'object') return null;
+		const v = stored._v_;
+		if (typeof v !== 'number') return null;
+		if (v > KNOWN_VAULT_VERSION) {
+			return (
+				'This backup was written by a newer version of rpass (v' +
+				v +
+				'); this page understands up to v' +
+				KNOWN_VAULT_VERSION +
+				'. Some fields may be missing or interpreted ' +
+				'incorrectly.'
+			);
+		}
+		return null;
+	}
+
 	function load(stored, mp) {
 		if (!stored || typeof stored !== 'object') {
 			throw new Error('not a vault object');
@@ -656,7 +725,7 @@ const RpassVault = (function () {
 		return Promise.resolve(readPlaintext(stored));
 	}
 
-	return { load: load };
+	return { load: load, checkVersion: checkVersion };
 })();
 
 </script>
@@ -833,24 +902,36 @@ function copyPassword() {
 ui.mp.addEventListener('change', clearDone);
 ui.mp.addEventListener('input', clearDone);
 
-ui.service.addEventListener('input', clearDone);
+ui.service.addEventListener('input', function () {
+	clearDone();
+	updateMigrationBadge();
+});
 ui.service.addEventListener('change', function () {
 	this.value = RpassDerive.normalizeIdentifier(this.value);
 	clearDone();
 	maybeAutofillFromImport();
+	updateMigrationBadge();
 });
 
-ui.user.addEventListener('input', clearDone);
+ui.user.addEventListener('input', function () {
+	clearDone();
+	updateMigrationBadge();
+});
 ui.user.addEventListener('change', function () {
 	this.value = RpassDerive.normalizeIdentifier(this.value);
 	clearDone();
 	maybeAutofillIter();
+	updateMigrationBadge();
 });
 
-ui.iter.addEventListener('input', clearDone);
+ui.iter.addEventListener('input', function () {
+	clearDone();
+	updateMigrationBadge();
+});
 ui.iter.addEventListener('change', function () {
 	this.value = RpassDerive.normalizeIter(this.value);
 	clearDone();
+	updateMigrationBadge();
 });
 
 // --- on-screen keyboard -------------------------------------------------
@@ -1410,6 +1491,20 @@ ui['import-file'].addEventListener('change', async function (e) {
 	importedVault = payload;
 	populateDatalists(payload);
 	say('Backup imported. Service and username suggestions are now available in their fields.');
+
+	// A version mismatch is a persistent condition of this page's
+	// state, not a transient status line, so it lives in its own
+	// element and stays visible until a new import replaces it.
+	const versionWarning = RpassVault.checkVersion(stored);
+	if (versionWarning) {
+		ui['import-notice'].textContent = '\u26a0 ' + versionWarning;
+		ui['import-notice'].hidden = false;
+	} else {
+		ui['import-notice'].hidden = true;
+		ui['import-notice'].textContent = '';
+	}
+
+	updateMigrationBadge();
 });
 
 function populateDatalists(vault) {
@@ -1465,6 +1560,10 @@ function maybeAutofillFromImport() {
 	if (!ui.user.value) ui.user.value = users[0];
 	const iter = record[ui.user.value];
 	if (iter !== undefined) ui.iter.value = String(iter);
+	// `ui.user.value` was set programmatically, which does not fire
+	// a `change` event; refresh the badge here so it reflects the
+	// newly-selected user.
+	updateMigrationBadge();
 }
 
 function maybeAutofillIter() {
@@ -1474,6 +1573,37 @@ function maybeAutofillIter() {
 	applyImportedAlgorithm(ui.service.value);
 	const iter = record[ui.user.value];
 	if (iter !== undefined) ui.iter.value = String(iter);
+	updateMigrationBadge();
+}
+
+// Per-pair migration state of the currently-selected account, taken
+// from the imported backup. Shown only while a backup carrying a
+// non-empty `migration` map is loaded and both fields are filled.
+// Outside of that window the badge is hidden, matching the web
+// app's stateless-and-boring default.
+function updateMigrationBadge() {
+	const badge = ui['migration-badge'];
+	if (!badge) return;
+	if (!importedVault || !importedVault.migration) {
+		badge.hidden = true;
+		return;
+	}
+	const svc = RpassDerive.normalizeIdentifier(ui.service.value);
+	const usr = RpassDerive.normalizeIdentifier(ui.user.value);
+	if (!svc || !usr) {
+		badge.hidden = true;
+		return;
+	}
+	const entry = importedVault.migration[svc];
+	const status = (entry && entry[usr]) || 'pending';
+	badge.hidden = false;
+	badge.textContent = status;
+	badge.classList.toggle('migrated', status === 'migrated');
+	badge.classList.toggle('pending', status === 'pending');
+	badge.title =
+		status === 'migrated'
+			? 'Backup recorded this account as migrated to the new master password'
+			: 'Backup recorded this account as still on the previous master password';
 }
 
 // --- clipboard ----------------------------------------------------------

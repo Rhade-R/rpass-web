@@ -269,3 +269,38 @@ button:disabled {color: #FFF;}
 .osk-state.visible {color: #E69F00;}
 
 #local-hint {max-width: 25em;}
+
+/* --- Migration state (from an imported backup) ----------------------- */
+
+.migration-badge {
+	flex: 0 0 auto;
+	font-size: 0.75em;
+	font-weight: 700;
+	min-width: 4.5em;
+	padding: 0.25em 0.4em;
+	margin: 0.25em;
+	border-radius: 8px;
+	background: var(--transp);
+	outline: 1px solid var(--button-bgc);
+	color: var(--button-bgc);
+	text-shadow: none;
+}
+
+.migration-badge.pending {
+	outline-color: #FB4;
+	color: #FB4;
+}
+
+.migration-badge.migrated {
+	outline-color: var(--success-bgc);
+	color: var(--success-bgc);
+}
+
+.import-notice {
+	color: #FB4;
+	font-size: 0.8em;
+	font-weight: 700;
+	text-align: center;
+	text-align-last: center;
+	line-height: 1.35;
+}

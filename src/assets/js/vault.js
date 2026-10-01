@@ -35,6 +35,16 @@ const RpassVault = (function () {
 		encoding: undefined
 	};
 
+	/*
+	 * Highest vault format version this page knows how to interpret.
+	 * Bump in lockstep with the extension when a new format version
+	 * lands. A backup whose `_v_` exceeds this may carry fields this
+	 * page would silently misread (or miss entirely), so the importer
+	 * warns — it does not refuse. Silent wrong passwords are the
+	 * failure mode being guarded against.
+	 */
+	const KNOWN_VAULT_VERSION = 6;
+
 	function base64ToBytes(b64) {
 		const binary = atob(b64);
 		const bytes = new Uint8Array(binary.length);
@@ -135,6 +145,28 @@ const RpassVault = (function () {
 		};
 	}
 
+	/**
+	 * Return a human-readable warning if the stored vault declares a
+	 * format version higher than this page understands, or `null` if
+	 * it looks fine. A missing `_v_` is version 1 and never warns.
+	 */
+	function checkVersion(stored) {
+		if (!stored || typeof stored !== 'object') return null;
+		const v = stored._v_;
+		if (typeof v !== 'number') return null;
+		if (v > KNOWN_VAULT_VERSION) {
+			return (
+				'This backup was written by a newer version of rpass (v' +
+				v +
+				'); this page understands up to v' +
+				KNOWN_VAULT_VERSION +
+				'. Some fields may be missing or interpreted ' +
+				'incorrectly.'
+			);
+		}
+		return null;
+	}
+
 	function load(stored, mp) {
 		if (!stored || typeof stored !== 'object') {
 			throw new Error('not a vault object');
@@ -172,5 +204,5 @@ const RpassVault = (function () {
 		return Promise.resolve(readPlaintext(stored));
 	}
 
-	return { load: load };
+	return { load: load, checkVersion: checkVersion };
 })();
